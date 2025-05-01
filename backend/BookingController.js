@@ -86,6 +86,23 @@ class BookingController {
           res.json({ success: true, requests: rows });
         });
       }
+      getAcceptedBookings(req, res) {
+        const { homeownerId } = req.params;
+        const sql = `
+          SELECT b.*, u.name as cleaner_name
+          FROM bookings b
+          JOIN users u ON b.cleaner_id = u.id
+          WHERE b.homeowner_id = ? AND b.status = 'Accepted'
+        `;
+      
+        this.db.all(sql, [homeownerId], (err, rows) => {
+          if (err) {
+            console.error("Fetch accepted bookings error:", err.message);
+            return res.status(500).json({ success: false });
+          }
+          res.json({ success: true, bookings: rows });
+        });
+      }
       
   }
   
