@@ -45,13 +45,17 @@ app.delete('/api/services/:serviceId', (req, res) => cleanerController.deleteSer
 app.post('/api/profile', (req, res) => cleanerController.saveProfile(req, res));
 app.get('/api/profile/:cleanerId', (req, res) => cleanerController.getProfile(req, res));
 app.get('/api/cleaners', (req, res) => cleanerController.getAllCleaners(req, res));
+app.get('/api/cleaner/details/:cleanerId', (req, res) =>cleanerController.getCleanerWithServicesAndReviews(req, res));
+app.post('/api/favourites', (req, res) => cleanerController.toggleFavourite(req, res));
+app.get('/api/homeowner/:id/favourites', (req, res) => {cleanerController.getFavourites(req, res);});
+
 
 // Booking routes
 app.post('/api/bookings', (req, res) => bookingController.createBooking(req, res));
 app.put('/api/bookings/:bookingId/accept', (req, res) => bookingController.acceptBooking(req, res));
 app.put('/api/bookings/:bookingId/decline', (req, res) => bookingController.declineBooking(req, res));
 app.get('/api/bookings/:cleanerId', (req, res) => bookingController.getPendingBookings(req, res));
-
+app.get('/api/bookings/accepted/:homeownerId', (req, res) =>bookingController.getAcceptedBookings(req, res));
 
 
 // ===================== SERVER ===================== //
