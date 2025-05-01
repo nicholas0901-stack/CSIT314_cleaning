@@ -17,12 +17,19 @@ const Dashboard = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showJobDetailsModal, setShowJobDetailsModal] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState('');
-const [selectedDatetime, setSelectedDatetime] = useState('');
-
+  const [selectedDatetime, setSelectedDatetime] = useState('');
+  const [isFavourite, setIsFavourite] = useState(false);
+  const [favourites, setFavourites] = useState([]);
+  const [showFavouritesModal, setShowFavouritesModal] = useState(false);
   const userId = location.state?.id || null;
-
-const [requests, setRequests] = useState([]); 
-  console.log("Cleaner ID inside Dashboard:", cleanerId); // <-- Add here
+  const [acceptedBookings, setAcceptedBookings] = useState([]);
+  const [showAcceptedModal, setShowAcceptedModal] = useState(false);
+  const [requests, setRequests] = useState([]); 
+  const [editingUser, setEditingUser] = useState(null);
+  const [editPassword, setEditPassword] = useState("");
+  const [editRole, setEditRole] = useState("");
+  const [showEditModal, setShowEditModal] = useState(false);
+    console.log("Cleaner ID inside Dashboard:", cleanerId); 
 
   const [tempProfile, setTempProfile] = useState({
     skills: '',
@@ -97,7 +104,7 @@ const [requests, setRequests] = useState([]);
       const data = await res.json();
       if (data.success) {
         alert("Profile saved successfully!");
-        setProfile(tempProfile);    // ✅ Update the real profile now!
+        setProfile(tempProfile);    
       } else {
         alert("Failed to save profile.");
       }
@@ -189,18 +196,31 @@ const [requests, setRequests] = useState([]);
   };  
   const handleViewProfile = async (cleaner) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/services/${cleaner.id}`);
+      const res = await fetch(
+        `http://localhost:5000/api/cleaner/details/${cleaner.id}?homeownerId=${userId}`
+      );
       const data = await res.json();
-      if (data.success) {
-        setSelectedCleaner({ ...cleaner, services: data.services });
-        setShowProfileModal(true);
-      } else {
-        alert('Failed to fetch cleaner services.');
-      }
+  
+      setSelectedCleaner({
+        id: cleaner.id,
+        name: cleaner.name,
+        experience: data.experience,
+        skills: data.skills,
+        preferred_areas: data.preferred_areas,
+        availability: data.availability,
+        services: data.services || [],
+        reviews: data.reviews || []
+      });
+  
+      setIsFavourite(data.isFavourite || false); 
+      setShowProfileModal(true);
     } catch (error) {
-      console.error('Error fetching cleaner services:', error);
+      console.error("Error fetching cleaner profile:", error);
     }
   };
+  
+  
+  
   
   const handleBookCleaner = async (cleaner) => {
     if (!selectedServiceName || !selectedServicePrice || !selectedLocation || !selectedDatetime) {
@@ -245,7 +265,7 @@ const [requests, setRequests] = useState([]);
       if (data.success) {
         alert('Booking accepted!');
   
-        // 🛠 Update status of the accepted request locally
+        //  Update status of the accepted request locally
         setRequests((prevRequests) =>
           prevRequests.map(req =>
             req.id === bookingId ? { ...req, status: 'Accepted' } : req
@@ -260,7 +280,20 @@ const [requests, setRequests] = useState([]);
     }
   };
   
-  
+  // Fetch accepted bookings
+  const fetchAcceptedBookings = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/bookings/accepted/${userId}`);
+      const data = await res.json();
+      if (data.success) {
+        setAcceptedBookings(data.bookings);
+      } else {
+        alert("Failed to load accepted bookings.");
+      }
+    } catch (error) {
+      console.error("Fetch accepted bookings error:", error);
+    }
+  };
   const handleDeclineRequest = async (bookingId) => {
     try {
       const res = await fetch(`http://localhost:5000/api/bookings/${bookingId}/decline`, {
@@ -270,7 +303,7 @@ const [requests, setRequests] = useState([]);
       if (data.success) {
         alert('Booking declined.');
   
-        // 🛠 Immediately remove the declined request from the list
+        //  remove the declined request from the list
         setRequests((prevRequests) => prevRequests.filter(req => req.id !== bookingId));
         
       } else {
@@ -305,6 +338,19 @@ const [requests, setRequests] = useState([]);
     }
   };
   
+  const fetchFavourites = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/homeowner/${userId}/favourites`);
+      const data = await res.json();
+      if (data.success) {
+        setFavourites(data.favourites);
+      } else {
+        alert("Failed to load favourites.");
+      }
+    } catch (error) {
+      console.error("Failed to fetch favourites:", error);
+    }
+  };
   
   
   const [showUserModal, setShowUserModal] = useState(false);
@@ -314,10 +360,7 @@ const [users, setUsers] = useState([
 const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "Cleaner" });
 const [userError, setUserError] = useState("");
 
-const [editingUser, setEditingUser] = useState(null);
-const [editPassword, setEditPassword] = useState("");
-const [editRole, setEditRole] = useState("");
-const [showEditModal, setShowEditModal] = useState(false);
+
 
   return (
     <div className="min-vh-100 bg-light">
@@ -338,39 +381,88 @@ const [showEditModal, setShowEditModal] = useState(false);
         <p className="lead text-dark">Here's your personalized cleaning dashboard</p>
 
         <div className="row g-4 mt-4">
-          {/* Homeowner cards */}
-          {role === "Homeowner" && (
-            <>
-              <div className="col-md-6 col-lg-6">
-                <div className="card shadow h-100">
-                  <div className="card-body">
-                    <h5 className="card-title">Find & Shortlist Cleaners</h5>
-                    <p className="card-text">Search and favourite potential cleaners for future bookings.</p>
-                    <a
-                        href="#"
-                        className="btn btn-outline-info btn-sm"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            fetchCleaners();
-                            setShowCleanerModal(true);
-                        }}
-                        >
-                        Search Cleaners
-                        </a>
-                  </div>
+        {/* Homeowner cards */}
+        {role === "Homeowner" && (
+          <>
+            {/* Search Cleaners */}
+            <div className="col-md-4">
+              <div className="card shadow h-100">
+                <div className="card-body">
+                  <h5 className="card-title">Find & Shortlist Cleaners</h5>
+                  <p className="card-text">
+                    Search and favourite potential cleaners for future bookings.
+                  </p>
+                  <button
+                    className="btn btn-outline-info btn-sm"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      fetchCleaners();
+                      setShowCleanerModal(true);
+                    }}
+                  >
+                    Search Cleaners
+                  </button>
                 </div>
               </div>
-              <div className="col-md-6 col-lg-6">
-                <div className="card shadow h-100">
-                  <div className="card-body">
-                    <h5 className="card-title">Used Services</h5>
-                    <p className="card-text">Check past services, filtered by type or period.</p>
-                    <a href="/homeowner/history" className="btn btn-outline-dark btn-sm">Service History</a>
-                  </div>
+            </div>
+
+            {/* Used Services */}
+            <div className="col-md-4">
+              <div className="card shadow h-100">
+                <div className="card-body">
+                  <h5 className="card-title">Used Services</h5>
+                  <p className="card-text">
+                    Check past services, filtered by type or period.
+                  </p>
+                  <a href="/homeowner/history" className="btn btn-outline-dark btn-sm">
+                    Service History
+                  </a>
                 </div>
               </div>
-            </>
-          )}
+            </div>
+
+            {/* My Favourites */}
+            <div className="col-md-4">
+              <div className="card shadow h-100">
+                <div className="card-body">
+                  <h5 className="card-title">My Favourites</h5>
+                  <p className="card-text">View and manage your favourited cleaners.</p>
+                  <button
+                    className="btn btn-outline-warning btn-sm"
+                    onClick={() => {
+                      fetchFavourites(); // 
+                      setShowFavouritesModal(true);
+                    }}
+                  >
+                    Show Favourites
+                  </button>
+                </div>
+              </div>
+            </div>
+            {/* Upcoming Bookings */}
+            <div className="col-md-4">
+              <div className="card shadow h-100">
+                <div className="card-body">
+                  <h5 className="card-title">Upcoming Bookings</h5>
+                  <p className="card-text">
+                    View the status of cleaners who have accepted your requests.
+                  </p>
+                  <button
+                    className="btn btn-outline-success btn-sm"
+                    onClick={() => {
+                      fetchAcceptedBookings(); 
+                      setShowAcceptedModal(true);
+                    }}
+                  >
+                    View Bookings
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+
 
           {/* Cleaner cards */}
           {role === "Cleaner" && (
@@ -434,7 +526,7 @@ const [showEditModal, setShowEditModal] = useState(false);
                 <div className="card shadow h-100">
                     <div className="card-body">
                     <h5 className="card-title">Payment Tracking</h5>
-                    <p className="card-text">Track completed payments and pending amounts.</p>
+                    <p className="card-text">Track job payments and pending amounts.</p>
                     <Button variant="outline-dark" size="sm">View Payments</Button>
                     </div>
                 </div>
@@ -681,9 +773,7 @@ const [showEditModal, setShowEditModal] = useState(false);
         </Button>
       </Modal.Footer>
     </Modal>
-
   </Modal.Body>
-
   <Modal.Footer>
     <Button variant="secondary" onClick={() => setShowUserModal(false)}>
       Close
@@ -957,8 +1047,6 @@ const [showEditModal, setShowEditModal] = useState(false);
         </Modal.Footer>
         </Modal>
 
-
-
 {/* Homeowner Modal */}
     <Modal show={showCleanerModal} onHide={() => setShowCleanerModal(false)} centered size="lg">
     <Modal.Header closeButton>
@@ -1011,121 +1099,250 @@ const [showEditModal, setShowEditModal] = useState(false);
     </Modal.Footer>
     </Modal>
    {/* Cleaner Profile Modal for HomeOwner */}
-<Modal show={showProfileModal} onHide={() => setShowProfileModal(false)} centered size="lg">
-  <Modal.Header closeButton>
-    <Modal.Title>{selectedCleaner?.name}'s Profile</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    {selectedCleaner ? (
-      <>
-        <h5 className="mb-3">Bio</h5>
-        <p>{selectedCleaner.skills || "N/A"}</p>
-
-        <h5 className="mb-3">Experience</h5>
-        <p>{selectedCleaner.experience ? `${selectedCleaner.experience} yrs` : "N/A"}</p>
-
-        <h5 className="mb-3">Preferred Areas</h5>
-        <p>{selectedCleaner.preferred_areas || "N/A"}</p>
-
-        <h5 className="mb-3">Availability</h5>
-        <p>{selectedCleaner.availability || "N/A"}</p>
-
-        <hr className="my-4" />
-
-        <h5 className="fw-bold">Services Offered</h5>
-        {selectedCleaner.services?.length > 0 ? (
+    <Modal show={showProfileModal} onHide={() => setShowProfileModal(false)} centered size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>{selectedCleaner?.name}'s Profile</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {selectedCleaner ? (
           <>
-            <table className="table table-bordered shadow-sm mt-3">
-              <thead className="table-light">
-                <tr>
-                  <th>Service Name</th>
-                  <th>Price ($)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedCleaner.services.map((service) => (
-                  <tr key={service.id}>
-                    <td>{service.service_name}</td>
-                    <td>${service.price}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <h5 className="mb-3">Bio</h5>
+            <p>{selectedCleaner.skills || "N/A"}</p>
 
-            {/* ===== Select Service to Book ===== */}
-            <Form.Group className="mt-4">
-              <Form.Label>Select a Service to Book</Form.Label>
-              <Form.Select
-                value={selectedServiceName}
-                onChange={(e) => {
-                  const selected = selectedCleaner.services.find(
-                    (service) => service.service_name === e.target.value
-                  );
-                  setSelectedServiceName(selected?.service_name || "");
-                  setSelectedServicePrice(selected?.price || "");
-                }}
-              >
-                <option value="">-- Please choose a service --</option>
-                {selectedCleaner.services.map((service) => (
-                  <option key={service.id} value={service.service_name}>
-                    {service.service_name} - ${service.price}
-                  </option>
-                ))}
-              </Form.Select>
-            </Form.Group>
+            <h5 className="mb-3">Experience</h5>
+            <p>{selectedCleaner.experience ? `${selectedCleaner.experience} yrs` : "N/A"}</p>
 
-            {/* ===== Select Location ===== */}
-            <Form.Group className="mt-4">
-              <Form.Label>Service Location</Form.Label>
-              <Form.Control
-                type="text"
-                placeholder="Enter location (e.g. 123 Main St)"
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-              />
-            </Form.Group>
+            <h5 className="mb-3">Preferred Areas</h5>
+            <p>{selectedCleaner.preferred_areas || "N/A"}</p>
 
-            {/* ===== Select Date/Time ===== */}
-            <Form.Group className="mt-3">
-              <Form.Label>Preferred Date & Time</Form.Label>
-              <Form.Control
-                type="datetime-local"
-                value={selectedDatetime}
-                onChange={(e) => setSelectedDatetime(e.target.value)}
-              />
-            </Form.Group>
+            <h5 className="mb-3">Availability</h5>
+            <p>{selectedCleaner.availability || "N/A"}</p>
 
-          </>
-        ) : (
-          <p className="text-muted">No services listed yet.</p>
-        )}
-      </>
-    ) : (
-      <p>Loading profile...</p>
-    )}
-  </Modal.Body>
+            <hr className="my-4" />
 
-  {/* ===== Footer Buttons ===== */}
-  <Modal.Footer>
-    <Button variant="secondary" onClick={() => setShowProfileModal(false)}>
-      Close
-    </Button>
-    <Button
-      variant="success"
-      onClick={() => {
-        if (!selectedServiceName || !selectedServicePrice || !selectedLocation || !selectedDatetime) {
-          alert("Please select service, location, and date/time before booking!");
-          return;
+            <h5 className="fw-bold">Services Offered</h5>
+            {selectedCleaner.services?.length > 0 ? (
+              <>
+                <table className="table table-bordered shadow-sm mt-3">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Service Name</th>
+                      <th>Price ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedCleaner.services.map((service) => (
+                      <tr key={service.id}>
+                        <td>{service.service_name}</td>
+                        <td>${service.price}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                    {/* ===== Select Service to Book ===== */}
+                    <Form.Group className="mt-4">
+                      <Form.Label>Select a Service to Book</Form.Label>
+                      <Form.Select
+                        value={selectedServiceName}
+                        onChange={(e) => {
+                          const selected = selectedCleaner.services.find(
+                            (service) => service.service_name === e.target.value
+                          );
+                          setSelectedServiceName(selected?.service_name || "");
+                          setSelectedServicePrice(selected?.price || "");
+                        }}
+                      >
+                        <option value="">-- Please choose a service --</option>
+                        {selectedCleaner.services.map((service) => (
+                          <option key={service.id} value={service.service_name}>
+                            {service.service_name} - ${service.price}
+                          </option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+
+                    {/* ===== Select Location ===== */}
+                    <Form.Group className="mt-4">
+                      <Form.Label>Service Location</Form.Label>
+                      <Form.Control
+                        type="text"
+                        placeholder="Enter location (e.g. 123 Main St)"
+                        value={selectedLocation}
+                        onChange={(e) => setSelectedLocation(e.target.value)}
+                      />
+                    </Form.Group>
+
+                    {/* ===== Select Date/Time ===== */}
+                    <Form.Group className="mt-3">
+                      <Form.Label>Preferred Date & Time</Form.Label>
+                      <Form.Control
+                        type="datetime-local"
+                        value={selectedDatetime}
+                        onChange={(e) => setSelectedDatetime(e.target.value)}
+                      />
+                    </Form.Group>
+
+                  </>
+                ) : (
+                  <p className="text-muted">No services listed yet.</p>
+                )}
+              </>
+            ) : (
+              <p>Loading profile...</p>
+            )}
+          </Modal.Body>
+
+      {/* ===== Footer Buttons ===== */}
+      <Modal.Footer>
+      <Button variant="secondary" onClick={() => setShowProfileModal(false)}>
+        Close
+      </Button>
+
+      <Button
+      style={{
+        backgroundColor: "#ffc107",  
+        color: "#000",               
+        border: "1px solid #ffc107"
+      }}
+      className="me-2"
+      onClick={async () => {
+        try {
+          const res = await fetch("http://localhost:5000/api/favourites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              homeownerId: userId,
+              cleanerId: selectedCleaner.id,
+            }),
+          });
+
+          const data = await res.json();
+          if (data.success) {
+            const message =
+              data.action === "added"
+                ? "Cleaner added to your favourites!"
+                : "Cleaner removed from your favourites.";
+            alert(message);
+
+            // Update state directly
+            setIsFavourite(data.action === "added");
+          } else {
+            alert("Failed to update favourites.");
+          }
+        } catch (err) {
+          console.error("Favourite error:", err);
         }
-        handleBookCleaner(selectedCleaner);
       }}
     >
-      Book This Cleaner
+      {isFavourite ? "Saved" : "Save to Favourites"}
     </Button>
-  </Modal.Footer>
-</Modal>
 
 
+        <Button
+          variant="success"
+          onClick={() => {
+            if (!selectedServiceName || !selectedServicePrice || !selectedLocation || !selectedDatetime) {
+              alert("Please select service, location, and date/time before booking!");
+              return;
+            }
+            handleBookCleaner(selectedCleaner);
+          }}
+        >
+          Book This Cleaner
+        </Button>
+    </Modal.Footer>
+    </Modal>
+    {/* ===== favourites for HomeOwner ===== */}
+    <Modal show={showFavouritesModal} onHide={() => setShowFavouritesModal(false)} centered size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>My Favourite Cleaners</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="text-muted mb-3">Here are the cleaners you've saved to favourites.</p>
+        <table className="table table-bordered shadow-sm">
+          <thead className="table-light">
+            <tr>
+              <th>Name</th>
+              <th>Experience</th>
+              <th>Preferred Areas</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {favourites.length > 0 ? (
+              favourites.map((cleaner) => (
+                <tr key={cleaner.id}>
+                  <td>{cleaner.name}</td>
+                  <td>{cleaner.experience ? `${cleaner.experience} yrs` : "N/A"}</td>
+                  <td>{cleaner.preferred_areas || "N/A"}</td>
+                  <td>
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      className="me-2"
+                      onClick={() => handleViewProfile(cleaner)}
+                    >
+                      View Profile
+                    </Button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="4" className="text-center">You haven't saved any favourites yet.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={() => setShowFavouritesModal(false)}>
+          Close
+        </Button>
+      </Modal.Footer>
+    </Modal>
+    {/* === Modal for Accepted Bookings === */}
+    <Modal show={showAcceptedModal} onHide={() => setShowAcceptedModal(false)} centered size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title>Confirmed Jobs</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="text-muted mb-3">These jobs have been accepted by your selected cleaners.</p>
+        <table className="table table-bordered shadow-sm">
+          <thead className="table-light">
+            <tr>
+              <th>Cleaner</th>
+              <th>Service</th>
+              <th>Price</th>
+              <th>Location</th>
+              <th>Date & Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {acceptedBookings.length > 0 ? (
+              acceptedBookings.map((job) => (
+                <tr key={job.id}>
+                  <td>{job.cleaner_name}</td>
+                  <td>{job.service_name}</td>
+                  <td>${job.price}</td>
+                  <td>{job.location}</td>
+                  <td>{job.appointment_datetime}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5" className="text-center">No accepted jobs yet.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={() => setShowAcceptedModal(false)}>
+          Close
+        </Button>
+      </Modal.Footer>
+    </Modal>
 
 
 
