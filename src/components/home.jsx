@@ -121,12 +121,13 @@ const Home = () => {
           <h2 className="fw-bold mb-4">Meet Our Team</h2>
           <div className="row g-4">
             {[
-              { name: "Alice Tan", title: "Operations Manager", image: "/img/team/team-member1.jpg", desc: "Oversees the team and ensures all cleaning assignments are done professionally." },
-              { name: "John Lim", title: "Senior Specialist", image: "/img/staff2.jpg", desc: "Expert in deep cleaning, post-renovation cleanup, and handling special requests." },
-              { name: "Mei Wong", title: "Client Relations", image: "/img/staff3.jpg", desc: "Handles customer communication, bookings, and ensures a smooth service experience." },
-              { name: "James Koh", title: "On-Site Coordinator", image: "/img/staff3.jpg", desc: "Coordinates schedules and team logistics to maintain service punctuality." },
-              { name: "Linda Chan", title: "Eco-Clean Lead", image: "/img/staff3.jpg", desc: "Manages the selection and use of eco-friendly cleaning products and methods." },
-              { name: "Noor Afiq", title: "Quality Inspector", image: "/img/staff3.jpg", desc: "Ensures all tasks meet the TeamABC quality standards before job completion." },
+              { name: "", title: "Leader", image: "/img/team/team-member1.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/staff2.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
             ].map((member, index) => (
               <div className="col-md-4" key={index}>
                 <div className="card h-100 shadow-sm">
