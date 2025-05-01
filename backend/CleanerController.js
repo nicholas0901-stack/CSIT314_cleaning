@@ -125,6 +125,109 @@ class CleanerController {
         }
       });
     }
+    getCleanerWithServicesAndReviews(req, res) {
+      const cleanerId = req.params.cleanerId;
+      const homeownerId = req.query.homeownerId; // <-- passed in query string from React
+    
+      const cleanerSql = `
+        SELECT users.id, users.name, cleaner_profiles.skills, cleaner_profiles.experience,
+               cleaner_profiles.preferred_areas, cleaner_profiles.availability
+        FROM users
+        LEFT JOIN cleaner_profiles ON users.id = cleaner_profiles.cleaner_id
+        WHERE users.id = ? AND users.role = 'Cleaner'
+      `;
+      const servicesSql = `SELECT * FROM services WHERE cleaner_id = ?`;
+      const reviewsSql = `
+        SELECT r.rating, r.comment, u.name as reviewer_name, r.created_at
+        FROM reviews r
+        JOIN users u ON r.homeowner_id = u.id
+        WHERE r.cleaner_id = ?
+        ORDER BY r.created_at DESC
+      `;
+      const favouriteSql = `SELECT * FROM favourites WHERE homeowner_id = ? AND cleaner_id = ?`;
+    
+      this.db.get(cleanerSql, [cleanerId], (err, cleaner) => {
+        if (err || !cleaner) return res.status(404).json({ error: "Cleaner not found" });
+    
+        this.db.all(servicesSql, [cleanerId], (err, services) => {
+          if (err) return res.status(500).json({ error: err.message });
+          cleaner.services = services;
+    
+          this.db.all(reviewsSql, [cleanerId], (err, reviews) => {
+            if (err) return res.status(500).json({ error: err.message });
+            cleaner.reviews = reviews;
+    
+            // Check favourite status
+            if (homeownerId) {
+              this.db.get(favouriteSql, [homeownerId, cleanerId], (err, favRow) => {
+                cleaner.isFavourite = !!favRow;
+                res.json(cleaner);
+              });
+            } else {
+              cleaner.isFavourite = false;
+              res.json(cleaner);
+            }
+          });
+        });
+      });
+    }
+    
+    toggleFavourite(req, res) {
+      const { homeownerId, cleanerId } = req.body;
+    
+      const checkSql = `SELECT * FROM favourites WHERE homeowner_id = ? AND cleaner_id = ?`;
+      const insertSql = `INSERT INTO favourites (homeowner_id, cleaner_id) VALUES (?, ?)`;
+      const deleteSql = `DELETE FROM favourites WHERE homeowner_id = ? AND cleaner_id = ?`;
+    
+      this.db.get(checkSql, [homeownerId, cleanerId], (err, row) => {
+        if (err) {
+          console.error("Favourite check error:", err.message);
+          return res.status(500).json({ success: false });
+        }
+    
+        if (row) {
+          // Already a favourite — so unfavourite
+          this.db.run(deleteSql, [homeownerId, cleanerId], function (err) {
+            if (err) {
+              console.error("Unfavourite error:", err.message);
+              return res.status(500).json({ success: false });
+            }
+            res.json({ success: true, action: "removed" });
+          });
+        } else {
+          // Not favourited — so add
+          this.db.run(insertSql, [homeownerId, cleanerId], function (err) {
+            if (err) {
+              console.error("Add to favourites error:", err.message);
+              return res.status(500).json({ success: false });
+            }
+            res.json({ success: true, action: "added" });
+          });
+        }
+      });
+    }
+    
+    getFavourites(req, res) {
+      const homeownerId = req.params.id;
+    
+      const sql = `
+        SELECT users.id, users.name, cp.experience, cp.preferred_areas
+        FROM favourites f
+        JOIN users ON f.cleaner_id = users.id
+        LEFT JOIN cleaner_profiles cp ON users.id = cp.cleaner_id
+        WHERE f.homeowner_id = ?
+      `;
+    
+      this.db.all(sql, [homeownerId], (err, rows) => {
+        if (err) {
+          console.error("Get favourites error:", err.message);
+          return res.status(500).json({ success: false });
+        }
+        res.json({ success: true, favourites: rows });
+      });
+    }
+    
+    
   }
   
   module.exports = CleanerController;
