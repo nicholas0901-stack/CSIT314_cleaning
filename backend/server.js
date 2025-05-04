@@ -1,6 +1,8 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const multer = require("multer");
+const path = require("path");
 const UserController = require('./UserController');
 const AuthController = require('./AuthController'); 
 const CleanerController = require('./CleanerController');
@@ -10,10 +12,10 @@ const PaymentController = require('./PaymentController');
 
 
 
-
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use('/images', express.static(path.join(__dirname, 'images')));
 
 // Connect to database
 const db = new sqlite3.Database('./teamabc.db', (err) => {
@@ -24,12 +26,27 @@ const db = new sqlite3.Database('./teamabc.db', (err) => {
   }
 });
 
+//image upload handle 
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "images/cleaners");  // ✅ Save directly to the served folder
+  },
+  filename: (req, file, cb) => {
+    cb(null, `cleaner_${Date.now()}${path.extname(file.originalname)}`);
+  }
+});
+
+
+const upload = multer({ storage });
 // Instantiate controllers
 const userController = new UserController(db);
 const authController = new AuthController(db);
 const cleanerController = new CleanerController(db);
 const bookingController = new BookingController(db);
 const paymentController = new PaymentController(db);
+
+
+
 
 
 // ===================== ROUTES ===================== //
@@ -54,7 +71,7 @@ app.get('/api/cleaners', (req, res) => cleanerController.getAllCleaners(req, res
 app.get('/api/cleaner/details/:cleanerId', (req, res) =>cleanerController.getCleanerWithServicesAndReviews(req, res));
 app.post('/api/favourites', (req, res) => cleanerController.toggleFavourite(req, res));
 app.get('/api/homeowner/:id/favourites', (req, res) => {cleanerController.getFavourites(req, res);});
-
+app.post("/api/cleaner/profile", upload.single("profileImage"), (req, res) =>cleanerController.saveProfileWithImage(req, res));
 // Booking routes
 app.post('/api/bookings', (req, res) => bookingController.createBooking(req, res));
 app.put('/api/bookings/:bookingId/accept', (req, res) => bookingController.acceptBooking(req, res));
@@ -72,6 +89,8 @@ app.get('/api/payments/cleaner/:cleanerId', (req, res) => paymentController.getP
 app.post('/api/payments', (req, res) => paymentController.addPaymentRecord(req, res));
 app.get('/api/cleaner/:cleanerId/earnings', (req, res) => paymentController.getCleanerEarnings(req, res));
 app.get("/api/wallet/:userId", (req, res) => paymentController.getWalletBalance(req, res));
+
+
 
 
 // ===================== SERVER ===================== //
