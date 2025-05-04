@@ -5,6 +5,10 @@ const UserController = require('./UserController');
 const AuthController = require('./AuthController'); 
 const CleanerController = require('./CleanerController');
 const BookingController = require('./BookingController');
+const PaymentController = require('./PaymentController');
+
+
+
 
 
 const app = express();
@@ -25,6 +29,8 @@ const userController = new UserController(db);
 const authController = new AuthController(db);
 const cleanerController = new CleanerController(db);
 const bookingController = new BookingController(db);
+const paymentController = new PaymentController(db);
+
 
 // ===================== ROUTES ===================== //
 
@@ -49,13 +55,23 @@ app.get('/api/cleaner/details/:cleanerId', (req, res) =>cleanerController.getCle
 app.post('/api/favourites', (req, res) => cleanerController.toggleFavourite(req, res));
 app.get('/api/homeowner/:id/favourites', (req, res) => {cleanerController.getFavourites(req, res);});
 
-
 // Booking routes
 app.post('/api/bookings', (req, res) => bookingController.createBooking(req, res));
 app.put('/api/bookings/:bookingId/accept', (req, res) => bookingController.acceptBooking(req, res));
 app.put('/api/bookings/:bookingId/decline', (req, res) => bookingController.declineBooking(req, res));
 app.get('/api/bookings/:cleanerId', (req, res) => bookingController.getPendingBookings(req, res));
 app.get('/api/bookings/accepted/:homeownerId', (req, res) =>bookingController.getAcceptedBookings(req, res));
+
+// Wallet routes
+app.get('/api/wallet/:userId', (req, res) => paymentController.getWalletBalance(req, res));
+app.post('/api/wallet/topup', (req, res) => paymentController.topUpWallet(req, res));
+
+// Payment routes
+app.post('/api/payments', (req, res) => paymentController.addPaymentRecord(req, res));
+app.get('/api/payments/cleaner/:cleanerId', (req, res) => paymentController.getPaymentsByCleaner(req, res));
+app.post('/api/payments', (req, res) => paymentController.addPaymentRecord(req, res));
+app.get('/api/cleaner/:cleanerId/earnings', (req, res) => paymentController.getCleanerEarnings(req, res));
+app.get("/api/wallet/:userId", (req, res) => paymentController.getWalletBalance(req, res));
 
 
 // ===================== SERVER ===================== //
