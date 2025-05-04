@@ -29,6 +29,15 @@ const Dashboard = () => {
   const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState("");
   const [showEditModal, setShowEditModal] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [topUpAmount, setTopUpAmount] = useState("");
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [cleanerPayments, setCleanerPayments] = useState([]);
+  const [showCleanerPaymentsModal, setShowCleanerPaymentsModal] = useState(false);
+  const [showCleanerWalletModal, setShowCleanerWalletModal] = useState(false);
+  const [cleanerWalletBalance, setCleanerWalletBalance] = useState(0);
+  
+
     console.log("Cleaner ID inside Dashboard:", cleanerId); 
 
   const [tempProfile, setTempProfile] = useState({
@@ -351,8 +360,111 @@ const Dashboard = () => {
       console.error("Failed to fetch favourites:", error);
     }
   };
+  // Fetch wallet balance
+const fetchWalletBalance = async () => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/wallet/${userId}`);
+    ;
+    const data = await res.json();
+    if (data.success) {
+      setWalletBalance(data.balance);
+    }
+  } catch (err) {
+    console.error("Failed to fetch wallet balance:", err);
+  }
+};
+const handleTopUp = async () => {
+  if (!topUpAmount || isNaN(topUpAmount)) {
+    alert("Please enter a valid amount.");
+    return;
+  }
+
+  try {
+    const res = await fetch("http://localhost:5000/api/wallet/topup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, amount: parseFloat(topUpAmount) }),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      alert("Top-up successful!");
+      setTopUpAmount(""); // clear input
+      fetchWalletBalance(); // refresh balance here 🔁
+    } else {
+      alert("Top-up failed.");
+    }
+  } catch (err) {
+    console.error("Top-up error:", err);
+  }
+};
+
+// Call fetchWalletBalance when wallet modal is opened
+useEffect(() => {
+  if (showWalletModal) {
+    fetchWalletBalance();
+  }
+}, [showWalletModal]);
   
-  
+const handlePayCleaner = async (job) => {
+  try {
+    const res = await fetch("http://localhost:5000/api/payments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bookingId: job.id,
+        amount: job.price,
+        method: "wallet",
+        status: "paid",
+        userId: userId, // homeowner ID
+      }),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      alert("Payment successful!");
+      fetchWalletBalance();      // update wallet UI
+      fetchAcceptedBookings();   // refresh bookings UI
+    } else {
+      alert("Payment failed. Do you have enough balance?");
+    }
+  } catch (err) {
+    console.error("Payment error:", err);
+    alert("Payment error occurred.");
+  }
+};
+
+
+const fetchCleanerPayments = async () => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/payments/cleaner/${cleanerId}`);
+    const data = await res.json();
+    if (data.success) {
+      setCleanerPayments(data.payments);
+    }
+  } catch (err) {
+    console.error("Failed to fetch cleaner payments:", err);
+  }
+};
+
+
+
+const fetchCleanerWallet = async () => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/wallet/${cleanerId}`);
+    const data = await res.json();
+    if (data.success) {
+      setCleanerWalletBalance(data.balance);
+    } else {
+      alert("Failed to fetch wallet balance.");
+    }
+  } catch (err) {
+    console.error("Cleaner wallet fetch error:", err);
+  }
+};
+
+
+
   const [showUserModal, setShowUserModal] = useState(false);
 const [users, setUsers] = useState([
   { id: 1, name: "Jane Doe", email: "jane@example.com", password: "test123", role: "Cleaner" }
@@ -445,7 +557,7 @@ const [userError, setUserError] = useState("");
                 <div className="card-body">
                   <h5 className="card-title">Upcoming Bookings</h5>
                   <p className="card-text">
-                    View the status of cleaners who have accepted your requests.
+                    View the status of cleaners accepted your requests.
                   </p>
                   <button
                     className="btn btn-outline-success btn-sm"
@@ -456,6 +568,16 @@ const [userError, setUserError] = useState("");
                   >
                     View Bookings
                   </button>
+                </div>
+              </div>
+            </div>
+            {/*Wallet*/}
+            <div className="col-md-4">
+              <div className="card shadow h-100">
+                <div className="card-body">
+                  <h5 className="card-title">My Wallet</h5>
+                  <p className="card-text">Top up and manage your balance for bookings.</p>
+                  <button className="btn btn-outline-primary btn-sm" onClick={() => setShowWalletModal(true)}>My Wallet</button>
                 </div>
               </div>
             </div>
@@ -527,12 +649,36 @@ const [userError, setUserError] = useState("");
                     <div className="card-body">
                     <h5 className="card-title">Payment Tracking</h5>
                     <p className="card-text">Track job payments and pending amounts.</p>
-                    <Button variant="outline-dark" size="sm">View Payments</Button>
+                    <Button variant="outline-dark" size="sm" onClick={() => {
+                      fetchCleanerPayments(); 
+                      setShowCleanerPaymentsModal(true);
+                    }}>
+                      View Payments
+                    </Button>
                     </div>
                 </div>
                 </div>
+                <div className="col-md-6 col-lg-4">
+                  <div className="card shadow h-100">
+                    <div className="card-body">
+                      <h5 className="card-title">My Wallet</h5>
+                      <p className="card-text">View your total earnings from completed jobs.</p>
+                      <Button
+                        variant="outline-success"
+                        size="sm"
+                        onClick={() => {
+                          fetchCleanerWallet();
+                          setShowCleanerWalletModal(true);
+                        }}
+                      >
+                        View Wallet
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              
             </>
-            )}
+           )}
 
 
           {/* Admin cards */}
@@ -1046,6 +1192,63 @@ const [userError, setUserError] = useState("");
             </Button>
         </Modal.Footer>
         </Modal>
+        {/* Cleaner Payment tracking */}
+        <Modal show={showCleanerPaymentsModal} onHide={() => setShowCleanerPaymentsModal(false)} centered size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>My Payment Records</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {cleanerPayments.length > 0 ? (
+            <table className="table table-bordered shadow-sm">
+              <thead className="table-light">
+                <tr>
+                  <th>Homeowner</th>
+                  <th>Service</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Paid At</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cleanerPayments.map((pmt) => (
+                  <tr key={pmt.id}>
+                    <td>{pmt.homeowner_name}</td>
+                    <td>{pmt.service_name}</td>
+                    <td>${pmt.amount}</td>
+                    <td>{pmt.status}</td>
+                    <td>{pmt.created_at}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-muted">No payments recorded yet.</p>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowCleanerPaymentsModal(false)}>Close</Button>
+        </Modal.Footer>
+      </Modal>
+      {/*Cleaner Wallets*/}
+      <Modal show={showCleanerWalletModal} onHide={() => setShowCleanerWalletModal(false)} centered>
+  <Modal.Header closeButton>
+    <Modal.Title>My Wallet</Modal.Title>
+  </Modal.Header>
+  <Modal.Body>
+    <p className="fs-5">
+      Total Balance: <strong>${cleanerWalletBalance.toFixed(2)}</strong>
+    </p>
+    <p className="text-muted">This reflects your total earnings available for withdrawal.</p>
+  </Modal.Body>
+  <Modal.Footer>
+    <Button variant="secondary" onClick={() => setShowCleanerWalletModal(false)}>
+      Close
+    </Button>
+  </Modal.Footer>
+</Modal>
+
+
+
 
 {/* Homeowner Modal */}
     <Modal show={showCleanerModal} onHide={() => setShowCleanerModal(false)} centered size="lg">
@@ -1316,6 +1519,7 @@ const [userError, setUserError] = useState("");
               <th>Price</th>
               <th>Location</th>
               <th>Date & Time</th>
+              <th>Payment</th>
             </tr>
           </thead>
           <tbody>
@@ -1327,6 +1531,20 @@ const [userError, setUserError] = useState("");
                   <td>${job.price}</td>
                   <td>{job.location}</td>
                   <td>{job.appointment_datetime}</td>
+                  <td>
+                    {job.is_paid ? (
+                      <span className="text-success">Paid</span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline-primary"
+                        onClick={() => handlePayCleaner(job)}
+                      >
+                        Pay Now
+                      </Button>
+                    )}
+                  </td>
+
                 </tr>
               ))
             ) : (
@@ -1343,6 +1561,37 @@ const [userError, setUserError] = useState("");
         </Button>
       </Modal.Footer>
     </Modal>
+{/* ===== Wallet Modal for Homeowner ===== */}
+<Modal show={showWalletModal} onHide={() => setShowWalletModal(false)} centered>
+  <Modal.Header closeButton>
+    <Modal.Title>My Wallet</Modal.Title>
+  </Modal.Header>
+  <Modal.Body>
+    <p className="text-muted mb-3">Current Balance: ${walletBalance.toFixed(2)}</p>
+
+    <Form>
+      <Form.Group>
+        <Form.Label>Top-Up Amount ($)</Form.Label>
+        <Form.Control
+          type="number"
+          placeholder="Enter amount"
+          value={topUpAmount}
+          onChange={(e) => setTopUpAmount(e.target.value)}
+          min={1}
+        />
+      </Form.Group>
+    </Form>
+  </Modal.Body>
+  <Modal.Footer>
+    <Button variant="secondary" onClick={() => setShowWalletModal(false)}>
+      Close
+    </Button>
+    <Button variant="primary" onClick={handleTopUp}>
+  Top Up
+</Button>
+
+  </Modal.Footer>
+</Modal>
 
 
 
