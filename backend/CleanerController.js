@@ -95,8 +95,13 @@ class CleanerController {
     // Fetch cleaner profile
     getProfile(req, res) {
       const { cleanerId } = req.params;
-      const sql = `SELECT * FROM cleaner_profiles WHERE cleaner_id = ?`;
-  
+      const sql = `
+        SELECT cp.*, u.image_path 
+        FROM cleaner_profiles cp
+        JOIN users u ON cp.cleaner_id = u.id
+        WHERE cp.cleaner_id = ?
+      `;
+    
       this.db.get(sql, [cleanerId], (err, row) => {
         if (err) {
           console.error('Get profile error:', err.message);
@@ -106,16 +111,19 @@ class CleanerController {
         }
       });
     }
+    
   
     // Get all cleaners with profiles
     getAllCleaners(req, res) {
       const sql = `
-        SELECT users.id, users.name, users.email, cleaner_profiles.skills, cleaner_profiles.experience, cleaner_profiles.preferred_areas, cleaner_profiles.availability
+        SELECT users.id, users.name, users.email, users.image_path, 
+               cleaner_profiles.skills, cleaner_profiles.experience, 
+               cleaner_profiles.preferred_areas, cleaner_profiles.availability
         FROM users
         LEFT JOIN cleaner_profiles ON users.id = cleaner_profiles.cleaner_id
         WHERE users.role = 'Cleaner'
       `;
-  
+    
       this.db.all(sql, [], (err, rows) => {
         if (err) {
           console.error('Get all cleaners error:', err.message);
@@ -125,17 +133,19 @@ class CleanerController {
         }
       });
     }
+    
     getCleanerWithServicesAndReviews(req, res) {
       const cleanerId = req.params.cleanerId;
       const homeownerId = req.query.homeownerId; // <-- passed in query string from React
     
       const cleanerSql = `
-        SELECT users.id, users.name, cleaner_profiles.skills, cleaner_profiles.experience,
-               cleaner_profiles.preferred_areas, cleaner_profiles.availability
-        FROM users
-        LEFT JOIN cleaner_profiles ON users.id = cleaner_profiles.cleaner_id
-        WHERE users.id = ? AND users.role = 'Cleaner'
-      `;
+      SELECT users.id, users.name, users.image_path, cleaner_profiles.skills, cleaner_profiles.experience,
+            cleaner_profiles.preferred_areas, cleaner_profiles.availability
+      FROM users
+      LEFT JOIN cleaner_profiles ON users.id = cleaner_profiles.cleaner_id
+      WHERE users.id = ? AND users.role = 'Cleaner'
+    `;
+
       const servicesSql = `SELECT * FROM services WHERE cleaner_id = ?`;
       const reviewsSql = `
         SELECT r.rating, r.comment, u.name as reviewer_name, r.created_at
@@ -171,6 +181,7 @@ class CleanerController {
         });
       });
     }
+    
     
     toggleFavourite(req, res) {
       const { homeownerId, cleanerId } = req.body;
@@ -211,7 +222,7 @@ class CleanerController {
       const homeownerId = req.params.id;
     
       const sql = `
-        SELECT users.id, users.name, cp.experience, cp.preferred_areas
+        SELECT users.id, users.name, users.image_path, cp.experience, cp.preferred_areas
         FROM favourites f
         JOIN users ON f.cleaner_id = users.id
         LEFT JOIN cleaner_profiles cp ON users.id = cp.cleaner_id
@@ -227,6 +238,60 @@ class CleanerController {
       });
     }
     
+    
+    saveProfileWithImage(req, res) {
+      const { cleanerId, skills, experience, preferredAreas, availability } = req.body;
+      const imagePath = req.file ? `images/cleaners/${req.file.filename}` : null;
+  
+      const checkSql = `SELECT * FROM cleaner_profiles WHERE cleaner_id = ?`;
+      this.db.get(checkSql, [cleanerId], (err, profile) => {
+        if (err) {
+          console.error("Profile check error:", err.message);
+          return res.status(500).json({ success: false });
+        }
+  
+        const updateImagePath = (callback) => {
+          if (imagePath) {
+            this.db.run(`UPDATE users SET image_path = ? WHERE id = ?`, [imagePath, cleanerId], (err) => {
+              if (err) console.error("Image update failed:", err.message);
+              callback();
+            });
+          } else {
+            callback();
+          }
+        };
+  
+        if (profile) {
+          const updateSql = `
+            UPDATE cleaner_profiles 
+            SET skills = ?, experience = ?, preferred_areas = ?, availability = ?
+            WHERE cleaner_id = ?
+          `;
+  
+          this.db.run(updateSql, [skills, experience, preferredAreas, availability, cleanerId], (err) => {
+            if (err) {
+              console.error("Profile update error:", err.message);
+              return res.status(500).json({ success: false });
+            }
+            updateImagePath(() => res.json({ success: true }));
+          });
+        } else {
+          const insertSql = `
+            INSERT INTO cleaner_profiles (cleaner_id, skills, experience, preferred_areas, availability)
+            VALUES (?, ?, ?, ?, ?)
+          `;
+  
+          this.db.run(insertSql, [cleanerId, skills, experience, preferredAreas, availability], function (err) {
+            if (err) {
+              console.error("Profile insert error:", err.message);
+              return res.status(500).json({ success: false });
+            }
+            updateImagePath(() => res.status(201).json({ success: true }));
+          });
+        }
+      });
+    }
+  
     
   }
   
