@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from 'react-hot-toast';
 
 const LoginForm = () => {
   const [email, setEmail] = useState("");
@@ -13,7 +14,7 @@ const LoginForm = () => {
     e.preventDefault();
   
     if (!email || !password) {
-      alert("Please enter email and password");
+      toast.error("Please enter email and password");
       return;
     }
   
@@ -26,6 +27,7 @@ const LoginForm = () => {
   
       const loginData = await loginResponse.json();
       if (loginData.success) {
+        toast.success('Login Sucessfully');
         navigate("/dashboard", {
           state: {
             id: loginData.user.id,
@@ -34,11 +36,11 @@ const LoginForm = () => {
           }
         });
       } else {
-        alert(loginData.message || "Login failed. Try again.");
+        toast.error(loginData.message || "Login failed. Try again.");
       }
     } catch (error) {
       console.error('Login error:', error);
-      alert('Something went wrong during login.');
+      toast.error('Something went wrong during login.');
     }
   };
   
@@ -46,7 +48,7 @@ const LoginForm = () => {
     e.preventDefault();
   
     if (!name || !email || !password || !role) {
-      alert("Please fill all fields to register.");
+      toast.error("Please fill all fields to register.");
       return;
     }
   
@@ -59,14 +61,14 @@ const LoginForm = () => {
   
       const registerData = await registerResponse.json();
       if (registerData.success) {
-        alert("Registration successful! Now please login.");
+        toast.success("Registration successful! Now please login.");
         setIsRegister(false); // Switch to Login screen after success
       } else {
-        alert(registerData.message || "Failed to register. Try again.");
+        toast.error(registerData.message || "Failed to register. Try again.");
       }
     } catch (error) {
       console.error('Register error:', error);
-      alert('Something went wrong during registration.');
+      toast.error('Something went wrong during registration.');
     }
   };
   
