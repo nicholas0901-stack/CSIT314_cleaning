@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { Modal, Button, Form } from "react-bootstrap";
-  
+import { toast } from 'react-hot-toast';
 const Dashboard = () => {
   const location = useLocation();
   const role = location.state?.role || "Guest";
@@ -36,7 +36,9 @@ const Dashboard = () => {
   const [showCleanerPaymentsModal, setShowCleanerPaymentsModal] = useState(false);
   const [showCleanerWalletModal, setShowCleanerWalletModal] = useState(false);
   const [cleanerWalletBalance, setCleanerWalletBalance] = useState(0);
-  
+  const [previewImageUrl, setPreviewImageUrl] = useState(null);
+
+
 
     console.log("Cleaner ID inside Dashboard:", cleanerId); 
 
@@ -63,12 +65,12 @@ const Dashboard = () => {
 
   const handleAddService = async () => {
     if (!newService.name || !newService.price) {
-      alert("Please fill in service name and price.");
+      toast.error("Please fill in service name and price.");
       return;
     }
   
     if (!cleanerId) {
-      alert("Cleaner ID missing. Cannot save service.");
+      toast.error("Cleaner ID missing. Cannot save service.");
       return;
     }
   
@@ -88,7 +90,7 @@ const Dashboard = () => {
         fetchServices();
         setNewService({ name: "", price: "" });
       } else {
-        alert("Failed to add service.");
+        toast.error("Failed to add service.");
       }
     } catch (error) {
       console.error(error);
@@ -97,30 +99,36 @@ const Dashboard = () => {
   
   
   const handleSaveProfile = async () => {
+    const formData = new FormData();
+    formData.append("cleanerId", userId); // or whatever cleaner ID you're using
+    formData.append("skills", tempProfile.skills);
+    formData.append("experience", tempProfile.experience);
+    formData.append("preferredAreas", tempProfile.preferred_areas);
+    formData.append("availability", tempProfile.availability);
+  
+    if (tempProfile.imageFile) {
+      formData.append("profileImage", tempProfile.imageFile);
+    }
+    
     try {
-      const res = await fetch('http://localhost:5000/api/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cleanerId: cleanerId,
-          skills: tempProfile.skills,
-          experience: tempProfile.experience,
-          preferredAreas: tempProfile.preferred_areas,
-          availability: tempProfile.availability,
-        }),
+      const response = await fetch("http://localhost:5000/api/cleaner/profile", {
+        method: "POST",
+        body: formData
       });
   
-      const data = await res.json();
-      if (data.success) {
-        alert("Profile saved successfully!");
-        setProfile(tempProfile);    
+      const result = await response.json();
+      if (result.success) {
+        alert("Profile updated successfully.");
+        // optionally re-fetch cleaner profile
       } else {
-        alert("Failed to save profile.");
+        alert("Failed to update profile.");
       }
     } catch (error) {
-      console.error(error);
+      console.error("Error updating profile:", error);
+      alert("An error occurred while updating your profile.");
     }
   };
+  
   
   
   const handleDeleteService = async (serviceId) => {
@@ -133,7 +141,7 @@ const Dashboard = () => {
       if (data.success) {
         fetchServices();
       } else {
-        alert("Failed to delete service.");
+        toast.error("Failed to delete service.");
       }
     } catch (error) {
       console.error(error);
@@ -158,6 +166,8 @@ const Dashboard = () => {
       const data = await res.json();
       if (data.success && data.profile) {
         setProfile(data.profile);
+        setTempProfile(data.profile); 
+
       }
     } catch (error) {
       console.error(error);
@@ -184,14 +194,31 @@ const Dashboard = () => {
   const handleSaveAll = async (e) => {
     e.preventDefault();
   
-    // Save service only if user entered a new one
+    // Save service (if any)
     if (newService.name && newService.price) {
       await handleAddService();
     }
   
-    // Always save profile
+    // Save profile 
     await handleSaveProfile();
+  
+    //  Re-fetch updated profile from backend
+    try {
+      const res = await fetch(`http://localhost:5000/api/profile/${cleanerId}`);
+      const data = await res.json();
+      if (data.success && data.profile) {
+        setTempProfile(data.profile); // Update state with fresh data
+  
+        //  Force reload image (append timestamp to avoid cache)
+        if (data.profile.image_path) {
+          setPreviewImageUrl(`http://localhost:5000/${data.profile.image_path}?t=${Date.now()}`);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to refresh profile after save:", err);
+    }
   };
+  
   const fetchCleaners = async () => {
     try {
       const res = await fetch('http://localhost:5000/api/cleaners');
@@ -213,6 +240,7 @@ const Dashboard = () => {
       setSelectedCleaner({
         id: cleaner.id,
         name: cleaner.name,
+        image_path: data.image_path || "",
         experience: data.experience,
         skills: data.skills,
         preferred_areas: data.preferred_areas,
@@ -233,7 +261,7 @@ const Dashboard = () => {
   
   const handleBookCleaner = async (cleaner) => {
     if (!selectedServiceName || !selectedServicePrice || !selectedLocation || !selectedDatetime) {
-      alert("Please select service, location, and date/time before booking!");
+      toast.error("Please select service, location, and date/time before booking!");
       return;
     }
   
@@ -253,14 +281,14 @@ const Dashboard = () => {
   
       const data = await response.json();
       if (data.success) {
-        alert('Booking request sent successfully!');
+        toast.success('Booking request sent successfully!');
         setShowProfileModal(false);
       } else {
-        alert('Failed to send booking request.');
+        toast.error('Failed to send booking request.');
       }
     } catch (error) {
       console.error('Booking error:', error);
-      alert('Something went wrong.');
+      toast.error('Something went wrong.');
     }
   };
   
@@ -272,7 +300,7 @@ const Dashboard = () => {
       });
       const data = await res.json();
       if (data.success) {
-        alert('Booking accepted!');
+        toast.success('Booking accepted!');
   
         //  Update status of the accepted request locally
         setRequests((prevRequests) =>
@@ -282,7 +310,7 @@ const Dashboard = () => {
         );
         
       } else {
-        alert('Failed to accept booking.');
+        toast.error('Failed to accept booking.');
       }
     } catch (error) {
       console.error('Accept error:', error);
@@ -297,7 +325,7 @@ const Dashboard = () => {
       if (data.success) {
         setAcceptedBookings(data.bookings);
       } else {
-        alert("Failed to load accepted bookings.");
+        toast.error("Failed to load accepted bookings.");
       }
     } catch (error) {
       console.error("Fetch accepted bookings error:", error);
@@ -310,13 +338,13 @@ const Dashboard = () => {
       });
       const data = await res.json();
       if (data.success) {
-        alert('Booking declined.');
+        toast.success('Booking declined.');
   
         //  remove the declined request from the list
         setRequests((prevRequests) => prevRequests.filter(req => req.id !== bookingId));
         
       } else {
-        alert('Failed to decline booking.');
+        toast.error('Failed to decline booking.');
       }
     } catch (error) {
       console.error('Decline error:', error);
@@ -354,7 +382,7 @@ const Dashboard = () => {
       if (data.success) {
         setFavourites(data.favourites);
       } else {
-        alert("Failed to load favourites.");
+        toast.error("Failed to load favourites.");
       }
     } catch (error) {
       console.error("Failed to fetch favourites:", error);
@@ -375,7 +403,7 @@ const fetchWalletBalance = async () => {
 };
 const handleTopUp = async () => {
   if (!topUpAmount || isNaN(topUpAmount)) {
-    alert("Please enter a valid amount.");
+    toast.error("Please enter a valid amount.");
     return;
   }
 
@@ -388,11 +416,11 @@ const handleTopUp = async () => {
 
     const data = await res.json();
     if (data.success) {
-      alert("Top-up successful!");
+      toast.success("Top-up successful!");
       setTopUpAmount(""); // clear input
       fetchWalletBalance(); // refresh balance here 🔁
     } else {
-      alert("Top-up failed.");
+      toast.error("Top-up failed.");
     }
   } catch (err) {
     console.error("Top-up error:", err);
@@ -422,15 +450,15 @@ const handlePayCleaner = async (job) => {
 
     const data = await res.json();
     if (data.success) {
-      alert("Payment successful!");
+      toast.success("Payment successful!");
       fetchWalletBalance();      // update wallet UI
       fetchAcceptedBookings();   // refresh bookings UI
     } else {
-      alert("Payment failed. Do you have enough balance?");
+      toast.error("Payment failed. Do you have enough balance?");
     }
   } catch (err) {
     console.error("Payment error:", err);
-    alert("Payment error occurred.");
+    toast.error("Payment error occurred.");
   }
 };
 
@@ -456,7 +484,7 @@ const fetchCleanerWallet = async () => {
     if (data.success) {
       setCleanerWalletBalance(data.balance);
     } else {
-      alert("Failed to fetch wallet balance.");
+      toast.error("Failed to fetch wallet balance.");
     }
   } catch (err) {
     console.error("Cleaner wallet fetch error:", err);
@@ -759,8 +787,9 @@ const [userError, setUserError] = useState("");
                   .then(data => {
                     if (data.success) {
                       fetchUsers(); // Refresh users list
+                      toast.success('Deleted User');
                     } else {
-                      alert('Failed to delete user.');
+                      toast.error('Failed to delete user.');
                     }
                   });
                 }}
@@ -909,8 +938,9 @@ const [userError, setUserError] = useState("");
                 setShowEditModal(false);
                 setEditingUser(null);
                 setEditPassword("");
+                toast.success('Saved Changes');
               } else {
-                alert('Failed to modify user.');
+                toast.error('Failed to modify user.');
               }
             });
           }}
@@ -938,12 +968,29 @@ const [userError, setUserError] = useState("");
     <p className="text-muted mb-4">
       Easily manage your cleaning services, skills, experience, and work preferences.
     </p>
-
+    {(previewImageUrl || tempProfile?.image_path) && (
+  <div className="text-center mb-4">
+    <img
+      src={previewImageUrl || `http://localhost:5000/${tempProfile.image_path}`}
+      alt="Cleaner Profile"
+      onError={(e) => {
+        e.target.onerror = null;
+        e.target.src = "http://localhost:5000/images/default.jpg"; // fallback
+      }}
+      style={{
+        width: "380px",
+        height: "500px",
+        objectFit: "cover",
+        border: "2px solid #dee2e6",
+      }}
+    />
+  </div>
+)}
     <Form onSubmit={handleSaveAll}>
-      {/* === Profile Section (TOP) === */}
       <h5 className="fw-bold mb-3">Your Profile Details</h5>
 
       <div className="mb-4">
+        
         <p><strong>Bio:</strong> {profile.skills || "No bio yet."}</p>
         <p><strong>Experience:</strong> {profile.experience ? `${profile.experience} years` : "No experience yet."}</p>
         <p><strong>Preferred Areas:</strong> {profile.preferred_areas || "No preferred areas yet."}</p>
@@ -1030,6 +1077,22 @@ const [userError, setUserError] = useState("");
 
       {/* === Edit Profile Section === */}
       <h5 className="fw-bold mb-3">Edit Your Profile</h5>
+
+      <Form.Group className="mb-3">
+      <Form.Label>Upload Profile Image</Form.Label>
+      <Form.Control
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files[0];
+          setTempProfile((prev) => ({
+            ...prev,
+            imageFile: file, // ✅ Save the actual file object for FormData
+          }));
+        }}
+      />
+    </Form.Group>
+
 
       <Form.Group className="mb-3">
         <Form.Label>Bio</Form.Label>
@@ -1251,149 +1314,178 @@ const [userError, setUserError] = useState("");
 
 
 {/* Homeowner Modal */}
-    <Modal show={showCleanerModal} onHide={() => setShowCleanerModal(false)} centered size="lg">
-    <Modal.Header closeButton>
-        <Modal.Title>Available Cleaners</Modal.Title>
-    </Modal.Header>
-    <Modal.Body>
-        <p className="text-muted mb-3">Browse and find available cleaners for your needs.</p>
-
-        {/* Cleaners Table */}
-        <table className="table table-bordered shadow-sm">
-        <thead className="table-light">
-            <tr>
-            <th>Name</th>
-            <th>Experience</th>
-            <th>Preferred Areas</th>
-            <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-    {cleaners.length > 0 ? (
+<Modal
+  show={showCleanerModal}
+  onHide={() => setShowCleanerModal(false)}
+  centered
+  dialogClassName="modal-xl" // Wider modal
+>
+  <Modal.Header closeButton>
+  <Modal.Title>Available Cleaners</Modal.Title>
+  </Modal.Header>
+  <Modal.Body>
+    <p className="text-muted mb-3">Browse and find available cleaners for your needs.</p>
+    <div className="row">
+      {cleaners.length > 0 ? (
         cleaners.map((cleaner) => (
-        <tr key={cleaner.id}>
-            <td>{cleaner.name}</td>
-            <td>{cleaner.experience ? `${cleaner.experience} yrs` : "N/A"}</td>
-            <td>{cleaner.preferred_areas || "N/A"}</td>
-            <td>
-            <Button
-                variant="outline-success"
-                size="sm"
-                className="me-2"
-                onClick={() => handleViewProfile(cleaner)}
-            >
-                View Profile
-            </Button>
-            </td>
-        </tr>
+          <div className="col-md-4 mb-4" key={cleaner.id}>
+            <div className="card shadow h-100">
+              <img
+                src={`http://localhost:5000/${cleaner.image_path || 'images/default.jpg'}`}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = 'http://localhost:5000/images/default.jpg';
+                }}
+                alt={`${cleaner.name}'s profile`}
+                className="card-img-top"
+                style={{
+                  height: "230px",
+                  objectFit: "contain",
+                  backgroundColor: "#f8f9fa",
+                  borderTopLeftRadius: "0.5rem",
+                  borderTopRightRadius: "0.5rem"
+                }}
+                
+              />
+              <div className="card-body text-center">
+                <h5 className="card-title">{cleaner.name}</h5>
+                <p className="card-text">
+                  <strong>Experience:</strong> {cleaner.experience ? `${cleaner.experience} yrs` : "N/A"}
+                </p>
+                <p className="card-text">
+                  <strong>Preferred Areas:</strong> {cleaner.preferred_areas || "N/A"}
+                </p>
+                <div className="mt-auto">
+                  <Button
+                    variant="outline-success"
+                    size="sm"
+                    onClick={() => {
+                      setShowCleanerModal(false);
+                      handleViewProfile(cleaner);
+                    }}
+                  >
+                    View Profile
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
         ))
-    ) : (
-        <tr>
-        <td colSpan="5" className="text-center">No cleaners available.</td>
-        </tr>
-    )}
-    </tbody>
-        </table>
-    </Modal.Body>
-    <Modal.Footer>
-        <Button variant="secondary" onClick={() => setShowCleanerModal(false)}>
-        Close
-        </Button>
-    </Modal.Footer>
-    </Modal>
+      ) : (
+        <div className="col-12">
+          <div className="alert alert-info text-center">No cleaners available.</div>
+        </div>
+      )}
+    </div>
+  </Modal.Body>
+
+  <Modal.Footer>
+    <Button variant="secondary" onClick={() => setShowCleanerModal(false)}>
+      Close
+    </Button>
+  </Modal.Footer>
+</Modal>
+
+
    {/* Cleaner Profile Modal for HomeOwner */}
     <Modal show={showProfileModal} onHide={() => setShowProfileModal(false)} centered size="lg">
       <Modal.Header closeButton>
         <Modal.Title>{selectedCleaner?.name}'s Profile</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        {selectedCleaner ? (
-          <>
-            <h5 className="mb-3">Bio</h5>
-            <p>{selectedCleaner.skills || "N/A"}</p>
+      {selectedCleaner ? (
+  <>
+    <div className="card shadow-sm mb-4">
+      <img
+        src={`http://localhost:5000/${selectedCleaner.image_path || 'images/default.jpg'}`}
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = 'http://localhost:5000/images/default.jpg';
+        }}
+        className="card-img-top"
+        alt={`${selectedCleaner.name}'s Profile`}
+        style={{
+          height: "400px",
+          objectFit: "contain",
+          borderTopLeftRadius: "0.5rem",
+          borderTopRightRadius: "0.5rem",
+        }}
+      />
+      <div className="card-body text-center">
+        <h4 className="card-title mb-3">{selectedCleaner.name}</h4>
+        <p><strong>Bio:</strong> {selectedCleaner.skills || "N/A"}</p>
+        <p><strong>Experience:</strong> {selectedCleaner.experience ? `${selectedCleaner.experience} yrs` : "N/A"}</p>
+        <p><strong>Preferred Areas:</strong> {selectedCleaner.preferred_areas || "N/A"}</p>
+        <p><strong>Availability:</strong> {selectedCleaner.availability || "N/A"}</p>
+      </div>
+    </div>
 
-            <h5 className="mb-3">Experience</h5>
-            <p>{selectedCleaner.experience ? `${selectedCleaner.experience} yrs` : "N/A"}</p>
+    <h5 className="fw-bold mb-3">Services Offered</h5>
 
-            <h5 className="mb-3">Preferred Areas</h5>
-            <p>{selectedCleaner.preferred_areas || "N/A"}</p>
+    {selectedCleaner.services?.length > 0 ? (
+      <div className="row">
+        {selectedCleaner.services.map((service) => (
+          <div className="col-md-4 mb-4" key={service.id}>
+            <div className="card h-100 shadow-sm">
+              <div className="card-body text-center">
+                <h6 className="card-title">{service.service_name}</h6>
+                <p className="card-text">
+                  <strong>Price:</strong> ${service.price}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p className="text-muted">No services listed yet.</p>
+    )}
 
-            <h5 className="mb-3">Availability</h5>
-            <p>{selectedCleaner.availability || "N/A"}</p>
+    {/* Booking Section */}
+    <Form.Group className="mt-4">
+      <Form.Label>Select a Service to Book</Form.Label>
+      <Form.Select
+        value={selectedServiceName}
+        onChange={(e) => {
+          const selected = selectedCleaner.services.find(
+            (service) => service.service_name === e.target.value
+          );
+          setSelectedServiceName(selected?.service_name || "");
+          setSelectedServicePrice(selected?.price || "");
+        }}
+      >
+        <option value="">-- Please choose a service --</option>
+        {selectedCleaner.services.map((service) => (
+          <option key={service.id} value={service.service_name}>
+            {service.service_name} - ${service.price}
+          </option>
+        ))}
+      </Form.Select>
+    </Form.Group>
 
-            <hr className="my-4" />
+    <Form.Group className="mt-4">
+      <Form.Label>Service Location</Form.Label>
+      <Form.Control
+        type="text"
+        placeholder="Enter location (e.g. 123 Main St)"
+        value={selectedLocation}
+        onChange={(e) => setSelectedLocation(e.target.value)}
+      />
+    </Form.Group>
 
-            <h5 className="fw-bold">Services Offered</h5>
-            {selectedCleaner.services?.length > 0 ? (
-              <>
-                <table className="table table-bordered shadow-sm mt-3">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Service Name</th>
-                      <th>Price ($)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedCleaner.services.map((service) => (
-                      <tr key={service.id}>
-                        <td>{service.service_name}</td>
-                        <td>${service.price}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                    {/* ===== Select Service to Book ===== */}
-                    <Form.Group className="mt-4">
-                      <Form.Label>Select a Service to Book</Form.Label>
-                      <Form.Select
-                        value={selectedServiceName}
-                        onChange={(e) => {
-                          const selected = selectedCleaner.services.find(
-                            (service) => service.service_name === e.target.value
-                          );
-                          setSelectedServiceName(selected?.service_name || "");
-                          setSelectedServicePrice(selected?.price || "");
-                        }}
-                      >
-                        <option value="">-- Please choose a service --</option>
-                        {selectedCleaner.services.map((service) => (
-                          <option key={service.id} value={service.service_name}>
-                            {service.service_name} - ${service.price}
-                          </option>
-                        ))}
-                      </Form.Select>
-                    </Form.Group>
-
-                    {/* ===== Select Location ===== */}
-                    <Form.Group className="mt-4">
-                      <Form.Label>Service Location</Form.Label>
-                      <Form.Control
-                        type="text"
-                        placeholder="Enter location (e.g. 123 Main St)"
-                        value={selectedLocation}
-                        onChange={(e) => setSelectedLocation(e.target.value)}
-                      />
-                    </Form.Group>
-
-                    {/* ===== Select Date/Time ===== */}
-                    <Form.Group className="mt-3">
-                      <Form.Label>Preferred Date & Time</Form.Label>
-                      <Form.Control
-                        type="datetime-local"
-                        value={selectedDatetime}
-                        onChange={(e) => setSelectedDatetime(e.target.value)}
-                      />
-                    </Form.Group>
-
-                  </>
-                ) : (
-                  <p className="text-muted">No services listed yet.</p>
-                )}
-              </>
-            ) : (
-              <p>Loading profile...</p>
-            )}
-          </Modal.Body>
+    <Form.Group className="mt-3">
+      <Form.Label>Preferred Date & Time</Form.Label>
+      <Form.Control
+        type="datetime-local"
+        value={selectedDatetime}
+        onChange={(e) => setSelectedDatetime(e.target.value)}
+      />
+    </Form.Group>
+  </>
+) : (
+  <p>Loading profile...</p>
+)}
+ </Modal.Body>
 
       {/* ===== Footer Buttons ===== */}
       <Modal.Footer>
@@ -1425,12 +1517,12 @@ const [userError, setUserError] = useState("");
               data.action === "added"
                 ? "Cleaner added to your favourites!"
                 : "Cleaner removed from your favourites.";
-            alert(message);
+            toast.success(message);
 
             // Update state directly
             setIsFavourite(data.action === "added");
           } else {
-            alert("Failed to update favourites.");
+            toast.error("Failed to update favourites.");
           }
         } catch (err) {
           console.error("Favourite error:", err);
@@ -1445,7 +1537,7 @@ const [userError, setUserError] = useState("");
           variant="success"
           onClick={() => {
             if (!selectedServiceName || !selectedServicePrice || !selectedLocation || !selectedDatetime) {
-              alert("Please select service, location, and date/time before booking!");
+              toast.error("Please select service, location, and date/time before booking!");
               return;
             }
             handleBookCleaner(selectedCleaner);
@@ -1461,43 +1553,56 @@ const [userError, setUserError] = useState("");
         <Modal.Title>My Favourite Cleaners</Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        <p className="text-muted mb-3">Here are the cleaners you've saved to favourites.</p>
-        <table className="table table-bordered shadow-sm">
-          <thead className="table-light">
-            <tr>
-              <th>Name</th>
-              <th>Experience</th>
-              <th>Preferred Areas</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {favourites.length > 0 ? (
-              favourites.map((cleaner) => (
-                <tr key={cleaner.id}>
-                  <td>{cleaner.name}</td>
-                  <td>{cleaner.experience ? `${cleaner.experience} yrs` : "N/A"}</td>
-                  <td>{cleaner.preferred_areas || "N/A"}</td>
-                  <td>
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      className="me-2"
-                      onClick={() => handleViewProfile(cleaner)}
-                    >
-                      View Profile
-                    </Button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="4" className="text-center">You haven't saved any favourites yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </Modal.Body>
+  <p className="text-muted mb-3">Here are the cleaners you've saved to favourites.</p>
+
+  {favourites.length > 0 ? (
+    <div className="row">
+      {favourites.map((cleaner) => (
+        <div className="col-md-4 mb-4" key={cleaner.id}> {/* <-- 3 columns per row */}
+          <div className="card shadow-sm h-100">
+            <img
+              src={`http://localhost:5000/${cleaner.image_path || "images/default.jpg"}`}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "http://localhost:5000/images/default.jpg";
+              }}
+              className="card-img-top"
+              alt={`${cleaner.name}'s Profile`}
+              style={{
+                height: "220px",
+                objectFit: "cover",
+                borderTopLeftRadius: "0.5rem",
+                borderTopRightRadius: "0.5rem",
+              }}
+            />
+            <div className="card-body text-center">
+              <h5 className="card-title">{cleaner.name}</h5>
+              <p className="card-text mb-1">
+                <strong>Experience:</strong> {cleaner.experience ? `${cleaner.experience} yrs` : "N/A"}
+              </p>
+              <p className="card-text mb-2">
+                <strong>Preferred Areas:</strong> {cleaner.preferred_areas || "N/A"}
+              </p>
+              <Button
+                variant="outline-success"
+                size="sm"
+                onClick={() => {
+                  setShowFavouritesModal(false);
+                  handleViewProfile(cleaner);
+                }}
+              >
+                View Profile
+              </Button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="alert alert-info text-center">You haven't saved any favourites yet.</div>
+  )}
+</Modal.Body>
+
       <Modal.Footer>
         <Button variant="secondary" onClick={() => setShowFavouritesModal(false)}>
           Close
@@ -1561,37 +1666,37 @@ const [userError, setUserError] = useState("");
         </Button>
       </Modal.Footer>
     </Modal>
-{/* ===== Wallet Modal for Homeowner ===== */}
-<Modal show={showWalletModal} onHide={() => setShowWalletModal(false)} centered>
-  <Modal.Header closeButton>
-    <Modal.Title>My Wallet</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <p className="text-muted mb-3">Current Balance: ${walletBalance.toFixed(2)}</p>
+    {/* ===== Wallet Modal for Homeowner ===== */}
+    <Modal show={showWalletModal} onHide={() => setShowWalletModal(false)} centered>
+      <Modal.Header closeButton>
+        <Modal.Title>My Wallet</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="text-muted mb-3">Current Balance: ${walletBalance.toFixed(2)}</p>
 
-    <Form>
-      <Form.Group>
-        <Form.Label>Top-Up Amount ($)</Form.Label>
-        <Form.Control
-          type="number"
-          placeholder="Enter amount"
-          value={topUpAmount}
-          onChange={(e) => setTopUpAmount(e.target.value)}
-          min={1}
-        />
-      </Form.Group>
-    </Form>
-  </Modal.Body>
-  <Modal.Footer>
-    <Button variant="secondary" onClick={() => setShowWalletModal(false)}>
-      Close
+        <Form>
+          <Form.Group>
+            <Form.Label>Top-Up Amount ($)</Form.Label>
+            <Form.Control
+              type="number"
+              placeholder="Enter amount"
+              value={topUpAmount}
+              onChange={(e) => setTopUpAmount(e.target.value)}
+              min={1}
+            />
+          </Form.Group>
+        </Form>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={() => setShowWalletModal(false)}>
+          Close
+        </Button>
+        <Button variant="primary" onClick={handleTopUp}>
+      Top Up
     </Button>
-    <Button variant="primary" onClick={handleTopUp}>
-  Top Up
-</Button>
 
-  </Modal.Footer>
-</Modal>
+      </Modal.Footer>
+    </Modal>
 
 
 
