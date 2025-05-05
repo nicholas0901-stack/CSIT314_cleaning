@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { Modal, Button, Form } from "react-bootstrap";
 import { toast } from 'react-hot-toast';
+import Calendar from 'react-calendar';
+import 'react-calendar/dist/Calendar.css';
+
 const Dashboard = () => {
   const location = useLocation();
   const role = location.state?.role || "Guest";
@@ -37,8 +40,9 @@ const Dashboard = () => {
   const [showCleanerWalletModal, setShowCleanerWalletModal] = useState(false);
   const [cleanerWalletBalance, setCleanerWalletBalance] = useState(0);
   const [previewImageUrl, setPreviewImageUrl] = useState(null);
-
-
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [acceptedJobs, setAcceptedJobs] = useState([]);
+  const [selectedDate, setSelectedDate] = useState(new Date());
 
     console.log("Cleaner ID inside Dashboard:", cleanerId); 
 
@@ -118,19 +122,23 @@ const Dashboard = () => {
   
       const result = await response.json();
       if (result.success) {
-        alert("Profile updated successfully.");
+        toast.success("Profile updated successfully.");
         // optionally re-fetch cleaner profile
       } else {
-        alert("Failed to update profile.");
+        toast.error("Failed to update profile.");
       }
     } catch (error) {
       console.error("Error updating profile:", error);
-      alert("An error occurred while updating your profile.");
+      toast.error("An error occurred while updating your profile.");
     }
   };
   
   
-  
+  // Helper to filter jobs for the selected date
+  const filteredJobs = acceptedJobs.filter((job) => {
+    const jobDate = new Date(job.appointment_datetime).toDateString();
+    return jobDate === selectedDate.toDateString();
+  });
   const handleDeleteService = async (serviceId) => {
     try {
       const res = await fetch(`http://localhost:5000/api/services/${serviceId}`, {
@@ -426,7 +434,21 @@ const handleTopUp = async () => {
     console.error("Top-up error:", err);
   }
 };
+useEffect(() => {
+  const fetchAcceptedJobs = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/bookings/cleaner/${cleanerId}/accepted`);
+      const data = await response.json();
+      if (data.success) setAcceptedJobs(data.bookings);
+    } catch (error) {
+      console.error("Error fetching accepted jobs:", error);
+    }
+  };
 
+  if (showScheduleModal) {
+    fetchAcceptedJobs();
+  }
+}, [showScheduleModal]);
 // Call fetchWalletBalance when wallet modal is opened
 useEffect(() => {
   if (showWalletModal) {
@@ -651,16 +673,21 @@ const [userError, setUserError] = useState("");
                     </div>
                 </div>
                 </div>
-
                 <div className="col-md-6 col-lg-4">
                 <div className="card shadow h-100">
-                    <div className="card-body">
+                  <div className="card-body">
                     <h5 className="card-title">Profile & Calendar</h5>
                     <p className="card-text">Manage your availability and view bookings.</p>
-                    <Button variant="outline-warning" size="sm">Manage Schedule</Button>
-                    </div>
+                    <Button 
+                      variant="outline-warning" 
+                      size="sm" 
+                      onClick={() => setShowScheduleModal(true)} // 🔥 Trigger modal here
+                    >
+                      Manage Schedule
+                    </Button>
+                  </div>
                 </div>
-                </div>
+              </div>
 
                 <div className="col-md-6 col-lg-4">
                 <div className="card shadow h-100">
@@ -1310,8 +1337,80 @@ const [userError, setUserError] = useState("");
   </Modal.Footer>
 </Modal>
 
+ {/* Manage Schedule For Cleaner modal */}
+<Modal show={showScheduleModal} onHide={() => setShowScheduleModal(false)} centered size="lg">
+  <Modal.Header closeButton>
+    <Modal.Title>Accepted Jobs</Modal.Title>
+  </Modal.Header>
 
+  <Modal.Body>
+    {acceptedJobs?.length > 0 ? (
+      <>
+        {/* === Calendar for Date Selection === */}
+        <div className="mb-4">
+          <h5 className="mb-2">Select Date</h5>
+          <Calendar
+            value={selectedDate}
+            onChange={setSelectedDate}
+            tileContent={({ date }) => {
+              const jobExists = acceptedJobs.some((job) =>
+                new Date(job.appointment_datetime).toDateString() === date.toDateString()
+              );
+              return jobExists ? (
+                <div
+                  style={{
+                    backgroundColor: "#d4edda",
+                    borderRadius: "4px",
+                    fontSize: "0.75rem",
+                    textAlign: "center",
+                    marginTop: "2px"
+                  }}
+                >
+                  📅
+                </div>
+              ) : null;
+            }}
+          />
+        </div>
 
+        {/* === Filtered Jobs Based on Date === */}
+        <h6 className="mb-3 text-muted">
+          Jobs on {selectedDate.toDateString()}
+        </h6>
+
+        {filteredJobs.length > 0 ? (
+          <div className="row">
+            {filteredJobs.map((job) => (
+              <div className="col-md-6 mb-4" key={job.id}>
+                <div className="card shadow-sm h-100">
+                  <div className="card-body">
+                    <h5 className="card-title">{job.service_name}</h5>
+                    <p><strong>Location:</strong> {job.location}</p>
+                    <p><strong>Date & Time:</strong> {job.appointment_datetime}</p>
+                    <p><strong>Price:</strong> ${job.price}</p>
+                    <p><strong>Status:</strong> {job.status}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="alert alert-info text-center">
+            No jobs scheduled for this date.
+          </div>
+        )}
+      </>
+    ) : (
+      <p className="text-center text-muted">No accepted jobs yet.</p>
+    )}
+  </Modal.Body>
+
+  <Modal.Footer>
+    <Button variant="secondary" onClick={() => setShowScheduleModal(false)}>
+      Close
+    </Button>
+  </Modal.Footer>
+</Modal>
 
 {/* Homeowner Modal */}
 <Modal
