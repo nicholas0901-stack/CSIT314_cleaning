@@ -78,6 +78,7 @@ app.put('/api/bookings/:bookingId/accept', (req, res) => bookingController.accep
 app.put('/api/bookings/:bookingId/decline', (req, res) => bookingController.declineBooking(req, res));
 app.get('/api/bookings/:cleanerId', (req, res) => bookingController.getPendingBookings(req, res));
 app.get('/api/bookings/accepted/:homeownerId', (req, res) =>bookingController.getAcceptedBookings(req, res));
+app.get('/api/bookings/cleaner/:cleanerId/accepted', (req, res) =>bookingController.getCleanerAcceptedBookings(req, res));
 
 // Wallet routes
 app.get('/api/wallet/:userId', (req, res) => paymentController.getWalletBalance(req, res));
