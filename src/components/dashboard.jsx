@@ -3,7 +3,6 @@ import { useLocation } from "react-router-dom";
 import { Modal, Button, Form } from "react-bootstrap";
 import { toast } from 'react-hot-toast';
 import 'react-calendar/dist/Calendar.css';
-{/*Homeowner Componenets*/}
 import RateCleanerModal from "./HomeownerModal/RateCleanerModal";
 import SearchCleanerModal from "./HomeownerModal/SearchCleanerModal";
 import CleanerProfileModal from './HomeownerModal/CleanerProfileModal';
@@ -13,14 +12,12 @@ import WalletModal from "./HomeownerModal/WalletModal";
 import PreferencesModal from "./HomeownerModal/PreferencesModal";
 import ReviewsModal from "./HomeownerModal/ReviewsModal";
 import ServiceHistoryModal from './HomeownerModal/ServiceHistoryModal';
-{/*Cleaner Componenets*/}
 import ManageServicesModal from "./CleanerModal/ManageServicesModal";
 import JobRequestsModal from "./CleanerModal/JobRequestsModal";
 import JobDetailsModal from './CleanerModal/JobDetailsModal';
 import CleanerPaymentsModal from "./CleanerModal/CleanerPaymentsModal";
 import CleanerWalletModal from "./CleanerModal/CleanerWalletModal";
 import ScheduleModal from "./CleanerModal/ScheduleModal";
-{/*Admin Componenets*/}
 import ManageUsersModal from './AdminModal/ManageUsersModal';
 
 
