@@ -8,6 +8,7 @@ const AuthController = require('./AuthController');
 const CleanerController = require('./CleanerController');
 const BookingController = require('./BookingController');
 const PaymentController = require('./PaymentController');
+const PreferenceController = require('./PreferenceController');
 
 
 
@@ -44,7 +45,7 @@ const authController = new AuthController(db);
 const cleanerController = new CleanerController(db);
 const bookingController = new BookingController(db);
 const paymentController = new PaymentController(db);
-
+const preferenceController = new PreferenceController(db);
 
 
 
@@ -79,6 +80,14 @@ app.put('/api/bookings/:bookingId/decline', (req, res) => bookingController.decl
 app.get('/api/bookings/:cleanerId', (req, res) => bookingController.getPendingBookings(req, res));
 app.get('/api/bookings/accepted/:homeownerId', (req, res) =>bookingController.getAcceptedBookings(req, res));
 app.get('/api/bookings/cleaner/:cleanerId/accepted', (req, res) =>bookingController.getCleanerAcceptedBookings(req, res));
+app.get('/api/bookings/completed/:homeownerId', (req, res) => bookingController.getCompletedBookings(req, res));
+
+// Cleaner marks booking as completed
+app.put('/api/bookings/:bookingId/complete', (req, res) => bookingController.markAsCompleted(req, res));
+
+// Homeowner rates completed booking
+app.post('/api/bookings/:bookingId/rate', (req, res) => bookingController.rateCompletedJob(req, res));
+app.get('/api/cleaners/:cleanerId/reviews', (req, res) => cleanerController.getCleanerReviews(req, res));
 
 // Wallet routes
 app.get('/api/wallet/:userId', (req, res) => paymentController.getWalletBalance(req, res));
@@ -92,7 +101,9 @@ app.get('/api/cleaner/:cleanerId/earnings', (req, res) => paymentController.getC
 app.get("/api/wallet/:userId", (req, res) => paymentController.getWalletBalance(req, res));
 
 
-
+// Preference routes
+app.get('/api/preferences/:homeownerId', (req, res) => preferenceController.getPreferences(req, res));
+app.post('/api/preferences/:homeownerId', (req, res) => preferenceController.savePreferences(req, res));
 
 // ===================== SERVER ===================== //
 
