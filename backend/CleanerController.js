@@ -115,74 +115,99 @@ class CleanerController {
   
     // Get all cleaners with profiles
     getAllCleaners(req, res) {
-      const sql = `
-        SELECT users.id, users.name, users.email, users.image_path, 
-               cleaner_profiles.skills, cleaner_profiles.experience, 
-               cleaner_profiles.preferred_areas, cleaner_profiles.availability
+      const { preferredArea } = req.query;
+    
+      let sql = `
+        SELECT 
+          users.id, 
+          users.name, 
+          users.email, 
+          users.image_path, 
+          cleaner_profiles.skills, 
+          cleaner_profiles.experience, 
+          cleaner_profiles.preferred_areas, 
+          cleaner_profiles.availability,
+          AVG(bookings.rating) AS average_rating
         FROM users
         LEFT JOIN cleaner_profiles ON users.id = cleaner_profiles.cleaner_id
+        LEFT JOIN bookings ON users.id = bookings.cleaner_id AND bookings.completed = 1 AND bookings.rating IS NOT NULL
         WHERE users.role = 'Cleaner'
       `;
     
-      this.db.all(sql, [], (err, rows) => {
+      const params = [];
+    
+      if (preferredArea) {
+        sql += ` AND cleaner_profiles.preferred_areas = ?`;
+        params.push(preferredArea);
+      }
+    
+      sql += ` GROUP BY users.id`;
+    
+      this.db.all(sql, params, (err, rows) => {
         if (err) {
-          console.error('Get all cleaners error:', err.message);
+          console.error('Get filtered cleaners error:', err.message);
           res.status(500).json({ success: false });
         } else {
-          res.json({ success: true, cleaners: rows });
+          const cleaners = rows.map(c => ({
+            ...c,
+            average_rating: c.average_rating ? parseFloat(c.average_rating).toFixed(1) : null
+          }));
+          res.json({ success: true, cleaners });
         }
       });
     }
     
-    getCleanerWithServicesAndReviews(req, res) {
-      const cleanerId = req.params.cleanerId;
-      const homeownerId = req.query.homeownerId; // <-- passed in query string from React
     
-      const cleanerSql = `
-      SELECT users.id, users.name, users.image_path, cleaner_profiles.skills, cleaner_profiles.experience,
-            cleaner_profiles.preferred_areas, cleaner_profiles.availability
-      FROM users
-      LEFT JOIN cleaner_profiles ON users.id = cleaner_profiles.cleaner_id
-      WHERE users.id = ? AND users.role = 'Cleaner'
-    `;
-
-      const servicesSql = `SELECT * FROM services WHERE cleaner_id = ?`;
-      const reviewsSql = `
-        SELECT r.rating, r.comment, u.name as reviewer_name, r.created_at
-        FROM reviews r
-        JOIN users u ON r.homeowner_id = u.id
-        WHERE r.cleaner_id = ?
-        ORDER BY r.created_at DESC
+      // Get all cleaners profiles with services and reviews
+      getCleanerWithServicesAndReviews(req, res) {
+        const cleanerId = req.params.cleanerId;
+        const homeownerId = req.query.homeownerId; // <-- passed in query string from React
+      
+        const cleanerSql = `
+        SELECT users.id, users.name, users.image_path, cleaner_profiles.skills, cleaner_profiles.experience,
+              cleaner_profiles.preferred_areas, cleaner_profiles.availability
+        FROM users
+        LEFT JOIN cleaner_profiles ON users.id = cleaner_profiles.cleaner_id
+        WHERE users.id = ? AND users.role = 'Cleaner'
       `;
-      const favouriteSql = `SELECT * FROM favourites WHERE homeowner_id = ? AND cleaner_id = ?`;
-    
-      this.db.get(cleanerSql, [cleanerId], (err, cleaner) => {
-        if (err || !cleaner) return res.status(404).json({ error: "Cleaner not found" });
-    
-        this.db.all(servicesSql, [cleanerId], (err, services) => {
-          if (err) return res.status(500).json({ error: err.message });
-          cleaner.services = services;
-    
-          this.db.all(reviewsSql, [cleanerId], (err, reviews) => {
+
+        const servicesSql = `SELECT * FROM services WHERE cleaner_id = ?`;
+        const reviewsSql = `
+          SELECT r.rating, r.comment, u.name as reviewer_name, r.created_at
+          FROM reviews r
+          JOIN users u ON r.homeowner_id = u.id
+          WHERE r.cleaner_id = ?
+          ORDER BY r.created_at DESC
+        `;
+        const favouriteSql = `SELECT * FROM favourites WHERE homeowner_id = ? AND cleaner_id = ?`;
+      
+        this.db.get(cleanerSql, [cleanerId], (err, cleaner) => {
+          if (err || !cleaner) return res.status(404).json({ error: "Cleaner not found" });
+      
+          this.db.all(servicesSql, [cleanerId], (err, services) => {
             if (err) return res.status(500).json({ error: err.message });
-            cleaner.reviews = reviews;
-    
-            // Check favourite status
-            if (homeownerId) {
-              this.db.get(favouriteSql, [homeownerId, cleanerId], (err, favRow) => {
-                cleaner.isFavourite = !!favRow;
+            cleaner.services = services;
+      
+            this.db.all(reviewsSql, [cleanerId], (err, reviews) => {
+              if (err) return res.status(500).json({ error: err.message });
+              cleaner.reviews = reviews;
+      
+              // Check favourite status
+              if (homeownerId) {
+                this.db.get(favouriteSql, [homeownerId, cleanerId], (err, favRow) => {
+                  cleaner.isFavourite = !!favRow;
+                  res.json(cleaner);
+                });
+              } else {
+                cleaner.isFavourite = false;
                 res.json(cleaner);
-              });
-            } else {
-              cleaner.isFavourite = false;
-              res.json(cleaner);
-            }
+              }
+            });
           });
         });
-      });
-    }
+      }
     
-    
+    // toogle cleaner favourite 
     toggleFavourite(req, res) {
       const { homeownerId, cleanerId } = req.body;
     
@@ -218,6 +243,7 @@ class CleanerController {
       });
     }
     
+    // get favourite cleaner functions
     getFavourites(req, res) {
       const homeownerId = req.params.id;
     
@@ -238,7 +264,7 @@ class CleanerController {
       });
     }
     
-    
+    // profile save with images
     saveProfileWithImage(req, res) {
       const { cleanerId, skills, experience, preferredAreas, availability } = req.body;
       const imagePath = req.file ? `images/cleaners/${req.file.filename}` : null;
@@ -291,7 +317,46 @@ class CleanerController {
         }
       });
     }
-  
+
+    // get cleaner reviews from homeowner
+    getCleanerReviews(req, res) {
+      const cleanerId = req.params.cleanerId;
+      const sql = `
+        SELECT r.rating, r.comment, r.created_at, u.name AS reviewer_name
+        FROM reviews r
+        JOIN users u ON r.homeowner_id = u.id
+        WHERE r.cleaner_id = ?
+        ORDER BY r.created_at DESC
+      `;
+    
+      this.db.all(sql, [cleanerId], (err, rows) => {
+        if (err) {
+          console.error("Review fetch error:", err.message);
+          return res.status(500).json({ success: false });
+        }
+        res.json({ success: true, reviews: rows });
+      });
+    }
+    // get cleaner jobs
+    getCleanerJobs(req, res) {
+      const { cleanerId } = req.params;
+      const sql = `
+        SELECT b.*, u.name as homeowner_name 
+        FROM bookings b
+        JOIN users u ON b.homeowner_id = u.id
+        WHERE b.cleaner_id = ?
+          AND (b.status = 'Accepted' OR b.status = 'Completed')
+        ORDER BY b.appointment_datetime ASC
+      `;
+    
+      this.db.all(sql, [cleanerId], (err, rows) => {
+        if (err) {
+          console.error("Get cleaner jobs error:", err.message);
+          return res.status(500).json({ success: false });
+        }
+        res.json({ success: true, bookings: rows });
+      });
+    }
     
   }
   
