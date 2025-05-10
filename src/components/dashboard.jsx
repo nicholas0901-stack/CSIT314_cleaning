@@ -2,8 +2,27 @@ import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { Modal, Button, Form } from "react-bootstrap";
 import { toast } from 'react-hot-toast';
-import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
+{/*Homeowner Componenets*/}
+import RateCleanerModal from "./HomeownerModal/RateCleanerModal";
+import SearchCleanerModal from "./HomeownerModal/SearchCleanerModal";
+import CleanerProfileModal from './HomeownerModal/CleanerProfileModal';
+import FavouritesModal from './HomeownerModal/FavouritesModal';
+import ViewBookings from "./HomeownerModal/ViewBookings";
+import WalletModal from "./HomeownerModal/WalletModal";
+import PreferencesModal from "./HomeownerModal/PreferencesModal";
+import ReviewsModal from "./HomeownerModal/ReviewsModal";
+import ServiceHistoryModal from './HomeownerModal/ServiceHistoryModal';
+{/*Cleaner Componenets*/}
+import ManageServicesModal from "./CleanerModal/ManageServicesModal";
+import JobRequestsModal from "./CleanerModal/JobRequestsModal";
+import JobDetailsModal from './CleanerModal/JobDetailsModal';
+import CleanerPaymentsModal from "./CleanerModal/CleanerPaymentsModal";
+import CleanerWalletModal from "./CleanerModal/CleanerWalletModal";
+import ScheduleModal from "./CleanerModal/ScheduleModal";
+{/*Admin Componenets*/}
+import ManageUsersModal from './AdminModal/ManageUsersModal';
+
 
 const Dashboard = () => {
   const location = useLocation();
@@ -43,8 +62,14 @@ const Dashboard = () => {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [acceptedJobs, setAcceptedJobs] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [showReviewsModal, setShowReviewsModal] = useState(false);
+  const [selectedCleanerReviews, setSelectedCleanerReviews] = useState([]);
+  const [showServiceHistory, setShowServiceHistory] = useState(false);
+  const [completedBookings, setCompletedBookings] = useState([]);
 
-    console.log("Cleaner ID inside Dashboard:", cleanerId); 
+   
 
   const [tempProfile, setTempProfile] = useState({
     skills: '',
@@ -137,7 +162,7 @@ const Dashboard = () => {
   // Helper to filter jobs for the selected date
   const filteredJobs = acceptedJobs.filter((job) => {
     const jobDate = new Date(job.appointment_datetime).toDateString();
-    return jobDate === selectedDate.toDateString();
+return jobDate === selectedDate.toDateString();
   });
   const handleDeleteService = async (serviceId) => {
     try {
@@ -229,7 +254,10 @@ const Dashboard = () => {
   
   const fetchCleaners = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/cleaners');
+      const area = preferences.preferred_area;
+      const url = area ? `http://localhost:5000/api/cleaners?preferredArea=${encodeURIComponent(area)}` : `http://localhost:5000/api/cleaners`;
+  
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
         setCleaners(data.cleaners);
@@ -237,7 +265,7 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Failed to fetch cleaners:', error);
     }
-  };  
+  };
   const handleViewProfile = async (cleaner) => {
     try {
       const res = await fetch(
@@ -339,6 +367,9 @@ const Dashboard = () => {
       console.error("Fetch accepted bookings error:", error);
     }
   };
+ 
+  
+  
   const handleDeclineRequest = async (bookingId) => {
     try {
       const res = await fetch(`http://localhost:5000/api/bookings/${bookingId}/decline`, {
@@ -359,17 +390,22 @@ const Dashboard = () => {
     }
   };
   
-  useEffect(() => {
-    if (role === "Cleaner") {
-      const interval = setInterval(() => {
-        fetchJobRequests();
-      }, 10000); // Refresh every 10 seconds
+ 
   
-      return () => clearInterval(interval);
+  // Define it at the top level in the component
+  const fetchAcceptedJobs = async () => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/bookings/cleaner/${cleanerId}/accepted`);
+      const data = await response.json();
+      if (data.success) {
+        setAcceptedJobs(data.bookings); // this now includes 'Accepted' and 'Completed'
+      }
+    } catch (error) {
+      console.error("Error fetching accepted jobs:", error);
     }
-  }, [role]);
+  };
   
-  
+
   
   const fetchJobRequests = async () => {
     try {
@@ -471,18 +507,22 @@ const handlePayCleaner = async (job) => {
     });
 
     const data = await res.json();
+
     if (data.success) {
       toast.success("Payment successful!");
-      fetchWalletBalance();      // update wallet UI
-      fetchAcceptedBookings();   // refresh bookings UI
+
+      //  Refresh job list and payment records
+      fetchAcceptedBookings();    // if you want to update the booking table
+      fetchCleanerPayments();     // this should update the records in the modal
     } else {
-      toast.error("Payment failed. Do you have enough balance?");
+      toast.error("Payment failed.");
     }
-  } catch (err) {
-    console.error("Payment error:", err);
-    toast.error("Payment error occurred.");
+  } catch (error) {
+    console.error("Payment error:", error);
+    toast.error("Something went wrong.");
   }
 };
+
 
 
 const fetchCleanerPayments = async () => {
@@ -513,6 +553,137 @@ const fetchCleanerWallet = async () => {
   }
 };
 
+const [preferences, setPreferences] = useState({
+  prefers_pet_friendly: false,
+  prefers_eco_friendly: false,
+  other_notes: "",
+});
+const [showPreferencesModal, setShowPreferencesModal] = useState(false);
+
+const fetchPreferences = async () => {
+  const res = await fetch(`http://localhost:5000/api/preferences/${userId}`);
+  const data = await res.json();
+  if (data.success) setPreferences(data.preferences);
+};
+
+const savePreferences = async () => {
+  try {
+    await fetch(`http://localhost:5000/api/preferences/${userId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(preferences),
+    });
+    toast.success("Preferences saved!");
+    setShowPreferencesModal(false);
+  } catch (error) {
+    console.error("Failed to save preferences:", error);
+    toast.error("Error saving preferences.");
+  }
+};
+
+const rateCleaner = async (bookingId, rating, comment) => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/bookings/${bookingId}/rate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rating, comment }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast.success("Thanks for your rating!");
+      setShowRatingModal(false);
+      fetchAcceptedBookings(); // refresh list
+    } else {
+      toast.error("Failed to submit rating.");
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+
+
+
+// mark complete jobs
+const markJobAsCompleted = async (bookingId) => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/bookings/${bookingId}/complete`, {
+      method: "PUT",
+    });
+    const data = await res.json();
+    if (data.success) {
+      toast.success("Job marked as completed!");
+      fetchAcceptedJobs();         
+      fetchAcceptedBookings();     
+    } else {
+      toast.error("Failed to mark job as completed.");
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+
+const fetchCleanerReviews = async (cleanerId) => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/cleaners/${cleanerId}/reviews`);
+    const data = await res.json();
+
+    if (data.success) {
+      setSelectedCleanerReviews(data.reviews);
+      setShowReviewsModal(true);
+    } else {
+      toast.error("Failed to fetch reviews.");
+    }
+  } catch (error) {
+    console.error("Review fetch error:", error);
+    toast.error("An error occurred while fetching reviews.");
+  }
+};
+
+const fetchCompletedServices = async () => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/bookings/completed/${userId}`);
+    const data = await res.json();
+    if (data.success) {
+      setCompletedBookings(data.bookings); // you must define this state
+    }
+  } catch (err) {
+    console.error("Error fetching completed services:", err);
+  }
+};
+
+useEffect(() => {
+  // Fetch accepted jobs if schedule modal is opened
+  if (showScheduleModal) {
+    const fetchAcceptedJobs = async () => {
+      try {
+        const response = await fetch(`http://localhost:5000/api/bookings/cleaner/${cleanerId}/accepted`);
+        const data = await response.json();
+        if (data.success) setAcceptedJobs(data.bookings);
+      } catch (error) {
+        console.error("Error fetching accepted jobs:", error);
+      }
+    };
+    fetchAcceptedJobs();
+  }
+
+  // Fetch wallet balance if wallet modal is opened
+  if (showWalletModal) {
+    const fetchWalletBalance = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/wallet/${userId}`);
+        const data = await res.json();
+        if (data.success) {
+          setWalletBalance(data.balance);
+        }
+      } catch (err) {
+        console.error("Failed to fetch wallet balance:", err);
+      }
+    };
+    fetchWalletBalance();
+  }
+}, [showScheduleModal, showWalletModal]);
 
 
   const [showUserModal, setShowUserModal] = useState(false);
@@ -576,9 +747,15 @@ const [userError, setUserError] = useState("");
                   <p className="card-text">
                     Check past services, filtered by type or period.
                   </p>
-                  <a href="/homeowner/history" className="btn btn-outline-dark btn-sm">
+                  <Button
+                    variant="outline-dark"
+                    onClick={() => {
+                      fetchCompletedServices(); // fetch data before opening modal
+                      setShowServiceHistory(true);
+                    }}
+                  >
                     Service History
-                  </a>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -628,6 +805,24 @@ const [userError, setUserError] = useState("");
                   <h5 className="card-title">My Wallet</h5>
                   <p className="card-text">Top up and manage your balance for bookings.</p>
                   <button className="btn btn-outline-primary btn-sm" onClick={() => setShowWalletModal(true)}>My Wallet</button>
+                </div>
+              </div>
+            </div>
+            {/* Preferences Card */}
+            <div className="col-md-4">
+              <div className="card shadow h-100">
+                <div className="card-body">
+                  <h5 className="card-title">My Cleaning Preferences</h5>
+                  <p className="card-text">Tell us your preferred cleaning options.</p>
+                  <button
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={() => {
+                      fetchPreferences();
+                      setShowPreferencesModal(true);
+                    }}
+                  >
+                    Edit Preferences
+                  </button>
                 </div>
               </div>
             </div>
@@ -764,1040 +959,170 @@ const [userError, setUserError] = useState("");
         </div>
       </div>
 
- {/* Admin User Management Modal */}
-<Modal show={showUserModal} onHide={() => setShowUserModal(false)} centered size="lg">
-  <Modal.Header closeButton>
-    <Modal.Title>Manage User Accounts</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <p className="text-muted mb-3">Create, modify, or remove user accounts below.</p>
-
-    {/* User Table */}
-    <table className="table table-bordered shadow-sm">
-      <thead className="table-light">
-        <tr>
-          <th>Name</th>
-          <th>Email</th>
-          <th>Role</th>
-          <th style={{ width: "200px" }}>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {users.map((user) => (
-          <tr key={user.id}>
-            <td>{user.name}</td>
-            <td>{user.email}</td>
-            <td>{user.role}</td>
-            <td>
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                className="me-2"
-                onClick={() => {
-                  setEditingUser(user);
-                  setEditRole(user.role);
-                  setEditPassword("");
-                  setShowEditModal(true);
-                }}
-              >
-                Modify
-              </Button>
-              <Button
-                variant="outline-danger"
-                size="sm"
-                onClick={() => {
-                  // Call DELETE /api/users/:id
-                  fetch(`http://localhost:5000/api/users/${user.id}`, {
-                    method: 'DELETE'
-                  })
-                  .then(res => res.json())
-                  .then(data => {
-                    if (data.success) {
-                      fetchUsers(); // Refresh users list
-                      toast.success('Deleted User');
-                    } else {
-                      toast.error('Failed to delete user.');
-                    }
-                  });
-                }}
-              >
-                Delete
-              </Button>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-
-    <hr className="my-4" />
-    {userError && <p className="text-danger">{userError}</p>}
-
-    {/* Create User Form */}
-    <h5 className="fw-bold">Create New User</h5>
-    <Form>
-      <Form.Group className="mb-3">
-        <Form.Label>Name</Form.Label>
-        <Form.Control
-          type="text"
-          placeholder="e.g. Alice Tan"
-          value={newUser.name}
-          onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-        />
-      </Form.Group>
-
-      <Form.Group className="mb-3">
-        <Form.Label>Email</Form.Label>
-        <Form.Control
-          type="email"
-          placeholder="e.g. alice@example.com"
-          value={newUser.email}
-          onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-        />
-      </Form.Group>
-
-      <Form.Group className="mb-3">
-        <Form.Label>Password</Form.Label>
-        <Form.Control
-          type="password"
-          placeholder="Enter temporary password"
-          value={newUser.password}
-          onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-        />
-      </Form.Group>
-
-      <Form.Group className="mb-3">
-        <Form.Label>Role</Form.Label>
-        <Form.Select
-          value={newUser.role}
-          onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-        >
-          <option>Cleaner</option>
-          <option>Homeowner</option>
-          <option>Admin</option>
-        </Form.Select>
-      </Form.Group>
-    </Form>
-
-    <Button
-      variant="success"
-      className="mt-2"
-      onClick={() => {
-        if (!newUser.name || !newUser.email || !newUser.password) {
-          setUserError("All fields are required.");
-          return;
-        }
-
-        // Call POST /api/users
-        fetch('http://localhost:5000/api/users', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(newUser)
-        })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            fetchUsers(); // Refresh users list
-            setNewUser({ name: "", email: "", password: "", role: "Cleaner" });
-            setUserError("");
-          } else {
-            setUserError("Failed to create user.");
-          }
-        });
-      }}
-    >
-      Create User
-    </Button>
-
-    {/* Edit User Modal */}
-    <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>Modify User: {editingUser?.name}</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <Form>
-          <Form.Group className="mb-3">
-            <Form.Label>New Password</Form.Label>
-            <Form.Control
-              type="password"
-              placeholder="Leave blank to keep unchanged"
-              value={editPassword}
-              onChange={(e) => setEditPassword(e.target.value)}
-            />
-          </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Label>New Role</Form.Label>
-            <Form.Select
-              value={editRole}
-              onChange={(e) => setEditRole(e.target.value)}
-            >
-              <option>Cleaner</option>
-              <option>Homeowner</option>
-              <option>Admin</option>
-            </Form.Select>
-          </Form.Group>
-        </Form>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={() => setShowEditModal(false)}>
-          Cancel
-        </Button>
-        <Button
-          variant="primary"
-          onClick={() => {
-            const updateData = {
-              role: editRole
-            };
-            if (editPassword) {
-              updateData.password = editPassword;
-            }
-
-            // Call PUT /api/users/:id
-            fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(updateData)
-            })
-            .then(res => res.json())
-            .then(data => {
-              if (data.success) {
-                fetchUsers(); // Refresh users list
-                setShowEditModal(false);
-                setEditingUser(null);
-                setEditPassword("");
-                toast.success('Saved Changes');
-              } else {
-                toast.error('Failed to modify user.');
-              }
-            });
-          }}
-        >
-          Save Changes
-        </Button>
-      </Modal.Footer>
-    </Modal>
-  </Modal.Body>
-  <Modal.Footer>
-    <Button variant="secondary" onClick={() => setShowUserModal(false)}>
-      Close
-    </Button>
-  </Modal.Footer>
-</Modal>
-
-
-{/* Cleaner Modal */}
-<Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
-  <Modal.Header closeButton>
-    <Modal.Title>Manage Your Services & Profile</Modal.Title>
-  </Modal.Header>
-
-  <Modal.Body>
-    <p className="text-muted mb-4">
-      Easily manage your cleaning services, skills, experience, and work preferences.
-    </p>
-    {(previewImageUrl || tempProfile?.image_path) && (
-  <div className="text-center mb-4">
-    <img
-      src={previewImageUrl || `http://localhost:5000/${tempProfile.image_path}`}
-      alt="Cleaner Profile"
-      onError={(e) => {
-        e.target.onerror = null;
-        e.target.src = "http://localhost:5000/images/default.jpg"; // fallback
-      }}
-      style={{
-        width: "380px",
-        height: "500px",
-        objectFit: "cover",
-        border: "2px solid #dee2e6",
-      }}
-    />
-  </div>
-)}
-    <Form onSubmit={handleSaveAll}>
-      <h5 className="fw-bold mb-3">Your Profile Details</h5>
-
-      <div className="mb-4">
-        
-        <p><strong>Bio:</strong> {profile.skills || "No bio yet."}</p>
-        <p><strong>Experience:</strong> {profile.experience ? `${profile.experience} years` : "No experience yet."}</p>
-        <p><strong>Preferred Areas:</strong> {profile.preferred_areas || "No preferred areas yet."}</p>
-        <p><strong>Availability:</strong> {profile.availability || "No availability set."}</p>
-      </div>
-
-      <hr className="my-4" />
-
-      {/* === Services Table Section === */}
-      <h5 className="fw-bold mb-3">Your Services</h5>
-      {services.length > 0 ? (
-        <table className="table table-bordered shadow-sm mb-4">
-          <thead className="table-light">
-            <tr>
-              <th>Service Name</th>
-              <th>Price ($)</th>
-              <th style={{ width: "150px" }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {services.map((service) => (
-              <tr key={service.id}>
-                <td>{service.service_name}</td>
-                <td>${service.price}</td>
-                <td>
-                  <Button
-                    variant="outline-danger"
-                    size="sm"
-                    type="button"
-                    onClick={() => handleDeleteService(service.id)}
-                  >
-                    Delete
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <div className="alert alert-info mb-4">
-          No services added yet. Start by adding your first service below!
-        </div>
-      )}
-
-      {/* === Add New Service Section === */}
-      <h6 className="fw-bold mb-3">Add New Service</h6>
-      <div className="row align-items-end mb-4">
-        <div className="col-md-5">
-          <Form.Group className="mb-3">
-            <Form.Label>Service Name</Form.Label>
-            <Form.Control
-              type="text"
-              placeholder="e.g. Deep Cleaning"
-              value={newService.name}
-              onChange={(e) => setNewService({ ...newService, name: e.target.value })}
-            />
-          </Form.Group>
-        </div>
-
-        <div className="col-md-5">
-          <Form.Group className="mb-3">
-            <Form.Label>Price ($)</Form.Label>
-            <Form.Control
-              type="number"
-              placeholder="e.g. 120"
-              value={newService.price}
-              onChange={(e) => setNewService({ ...newService, price: e.target.value })}
-            />
-          </Form.Group>
-        </div>
-
-        <div className="col-md-2 d-grid">
-          <Button
-            variant="success"
-            type="button"
-            onClick={handleAddService}
-          >
-            + Add
-          </Button>
-        </div>
-      </div>
-
-      <hr className="my-4" />
-
-      {/* === Edit Profile Section === */}
-      <h5 className="fw-bold mb-3">Edit Your Profile</h5>
-
-      <Form.Group className="mb-3">
-      <Form.Label>Upload Profile Image</Form.Label>
-      <Form.Control
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files[0];
-          setTempProfile((prev) => ({
-            ...prev,
-            imageFile: file, // ✅ Save the actual file object for FormData
-          }));
-        }}
-      />
-    </Form.Group>
-
-
-      <Form.Group className="mb-3">
-        <Form.Label>Bio</Form.Label>
-        <Form.Control
-          as="textarea"
-          rows={2}
-          placeholder="e.g. Experienced in residential cleaning, passionate about customer satisfaction."
-          value={tempProfile.skills || ""}
-          onChange={(e) => setTempProfile({ ...tempProfile, skills: e.target.value })}
-        />
-      </Form.Group>
-
-      <Form.Group className="mb-3">
-        <Form.Label>Experience (Years)</Form.Label>
-        <Form.Control
-          type="number"
-          placeholder="e.g. 3"
-          value={tempProfile.experience || ""}
-          onChange={(e) => setTempProfile({ ...tempProfile, experience: e.target.value })}
-        />
-      </Form.Group>
-
-      <Form.Group className="mb-3">
-        <Form.Label>Preferred Work Areas</Form.Label>
-        <Form.Select
-            value={tempProfile.preferred_areas || ""}
-            onChange={(e) => setTempProfile({ ...tempProfile, preferred_areas: e.target.value })}
-        >
-            <option value="">-- Select Area --</option>
-            <option value="North">North</option>
-            <option value="South">South</option>
-            <option value="East">East</option>
-            <option value="West">West</option>
-        </Form.Select>
-      </Form.Group>
-
-
-      <Form.Group className="mb-3">
-        <Form.Label>Availability</Form.Label>
-        <Form.Control
-          as="textarea"
-          rows={2}
-          placeholder="e.g. Weekdays 9am-6pm, Saturday mornings"
-          value={tempProfile.availability || ""}
-          onChange={(e) => setTempProfile({ ...tempProfile, availability: e.target.value })}
-        />
-      </Form.Group>
-
-      {/* === Save All Button === */}
-      <div className="d-flex justify-content-end">
-        <Button type="submit" variant="primary">
-          Save Profile Changes
-                </Button>
-            </div>
-            </Form>
-        </Modal.Body>
-
-        <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowModal(false)}>
-            Close
-            </Button>
-        </Modal.Footer>
-        </Modal>
-      {/* === Job Request === */}
-      <Modal show={showRequestsModal} onHide={() => setShowRequestsModal(false)} centered size="lg">
-        <Modal.Header closeButton>
-            <Modal.Title>Job Requests</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-            {requests.length > 0 ? (
-            <table className="table table-bordered shadow-sm">
-                <thead className="table-light">
-                <tr>
-                    <th>Homeowner</th>
-                    <th>Service</th>
-                    <th>Price</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-                </thead>
-                <tbody>
-                {requests.map((req) => (
-                    <tr key={req.id}>
-                    <td>{req.homeowner_name || "N/A"}</td>
-                    <td>{req.service_name}</td>
-                    <td>${req.price}</td>
-                    <td>{req.status}</td>
-                    <td>
-                        <Button
-                            variant="outline-success"
-                            size="sm"
-                            onClick={() => {
-                            setSelectedRequest(req);
-                            setShowRequestsModal(false); // 🔥 Hide the Requests Modal
-                            setShowJobDetailsModal(true); // 🔥 Open the Job Details Modal
-                            }}
-                        >
-                            View
-                        </Button>
-                        </td>
-                    </tr>
-                ))}
-                </tbody>
-            </table>
-            ) : (
-            <p className="text-center">No requests available.</p>
-            )}
-        </Modal.Body>
-        <Modal.Footer>
-            <Button variant="secondary" onClick={() => setShowRequestsModal(false)}>
-            Close
-            </Button>
-        </Modal.Footer>
-        </Modal>
-        {/* Cleaner Job Details Modal */}
-        <Modal show={showJobDetailsModal} onHide={() => setShowJobDetailsModal(false)} centered>
-        <Modal.Header closeButton>
-            <Modal.Title>Job Details</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-            {selectedRequest ? (
-           <>
-           <p><strong>Homeowner:</strong> {selectedRequest.homeowner_name}</p>
-           <p><strong>Service:</strong> {selectedRequest.service_name}</p>
-           <p><strong>Price:</strong> ${selectedRequest.price}</p>
-           <p><strong>Location:</strong> {selectedRequest.location || "N/A"}</p>
-           <p><strong>Date & Time:</strong> {selectedRequest.appointment_datetime || "N/A"}</p>
-           <p><strong>Status:</strong> {selectedRequest.status}</p>
-         </>
-         
-            ) : (
-            <p>Loading job details...</p>
-            )}
-        </Modal.Body>
-        <Modal.Footer>
-            {selectedRequest && selectedRequest.status === "Pending" && (
-            <>
-                <Button
-                variant="outline-success"
-                onClick={() => {
-                    handleAcceptRequest(selectedRequest.id);
-                    setShowJobDetailsModal(false);
-                }}
-                >
-                Accept
-                </Button>
-                <Button
-                variant="outline-danger"
-                onClick={() => {
-                    handleDeclineRequest(selectedRequest.id);
-                    setShowJobDetailsModal(false);
-                }}
-                >
-                Decline
-                </Button>
-            </>
-            )}
-            <Button variant="secondary" onClick={() => setShowJobDetailsModal(false)}>
-            Close
-            </Button>
-        </Modal.Footer>
-        </Modal>
-        {/* Cleaner Payment tracking */}
-        <Modal show={showCleanerPaymentsModal} onHide={() => setShowCleanerPaymentsModal(false)} centered size="lg">
-        <Modal.Header closeButton>
-          <Modal.Title>My Payment Records</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          {cleanerPayments.length > 0 ? (
-            <table className="table table-bordered shadow-sm">
-              <thead className="table-light">
-                <tr>
-                  <th>Homeowner</th>
-                  <th>Service</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th>Paid At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cleanerPayments.map((pmt) => (
-                  <tr key={pmt.id}>
-                    <td>{pmt.homeowner_name}</td>
-                    <td>{pmt.service_name}</td>
-                    <td>${pmt.amount}</td>
-                    <td>{pmt.status}</td>
-                    <td>{pmt.created_at}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="text-muted">No payments recorded yet.</p>
-          )}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowCleanerPaymentsModal(false)}>Close</Button>
-        </Modal.Footer>
-      </Modal>
-      {/*Cleaner Wallets*/}
-      <Modal show={showCleanerWalletModal} onHide={() => setShowCleanerWalletModal(false)} centered>
-  <Modal.Header closeButton>
-    <Modal.Title>My Wallet</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <p className="fs-5">
-      Total Balance: <strong>${cleanerWalletBalance.toFixed(2)}</strong>
-    </p>
-    <p className="text-muted">This reflects your total earnings available for withdrawal.</p>
-  </Modal.Body>
-  <Modal.Footer>
-    <Button variant="secondary" onClick={() => setShowCleanerWalletModal(false)}>
-      Close
-    </Button>
-  </Modal.Footer>
-</Modal>
-
- {/* Manage Schedule For Cleaner modal */}
-<Modal show={showScheduleModal} onHide={() => setShowScheduleModal(false)} centered size="lg">
-  <Modal.Header closeButton>
-    <Modal.Title>Accepted Jobs</Modal.Title>
-  </Modal.Header>
-
-  <Modal.Body>
-    {acceptedJobs?.length > 0 ? (
-      <>
-        {/* === Calendar for Date Selection === */}
-        <div className="mb-4">
-          <h5 className="mb-2">Select Date</h5>
-          <Calendar
-            value={selectedDate}
-            onChange={setSelectedDate}
-            tileContent={({ date }) => {
-              const jobExists = acceptedJobs.some((job) =>
-                new Date(job.appointment_datetime).toDateString() === date.toDateString()
-              );
-              return jobExists ? (
-                <div
-                  style={{
-                    backgroundColor: "#d4edda",
-                    borderRadius: "4px",
-                    fontSize: "0.75rem",
-                    textAlign: "center",
-                    marginTop: "2px"
-                  }}
-                >
-                  📅
-                </div>
-              ) : null;
-            }}
+ {/* Admin Main Modal */}
+           {/* Admin Mangement Modal  */}
+          <ManageUsersModal
+            showUserModal={showUserModal}
+            setShowUserModal={setShowUserModal}
+            users={users}
+            newUser={newUser}
+            setNewUser={setNewUser}
+            userError={userError}
+            setUserError={setUserError}
+            fetchUsers={fetchUsers}
+            showEditModal={showEditModal}
+            setShowEditModal={setShowEditModal}
+            editingUser={editingUser}
+            setEditingUser={setEditingUser}
+            editPassword={editPassword}
+            setEditPassword={setEditPassword}
+            editRole={editRole}
+            setEditRole={setEditRole}
           />
-        </div>
 
-        {/* === Filtered Jobs Based on Date === */}
-        <h6 className="mb-3 text-muted">
-          Jobs on {selectedDate.toDateString()}
-        </h6>
+{/* Cleaner Main Modal */}
+        {/* Manage services & profile modal */}
+        <ManageServicesModal
+          show={showModal}
+          onHide={() => setShowModal(false)}
+          profile={profile}
+          tempProfile={tempProfile}
+          setTempProfile={setTempProfile}
+          previewImageUrl={previewImageUrl}
+          services={services}
+          newService={newService}
+          setNewService={setNewService}
+          handleAddService={handleAddService}
+          handleDeleteService={handleDeleteService}
+          handleSaveAll={handleSaveAll}
+          preferences={preferences}
+          setPreferences={setPreferences}
+        />
+        {/* Cleaner Job request Modal */}
+        <JobRequestsModal
+          show={showRequestsModal}
+          onHide={() => setShowRequestsModal(false)}
+          requests={requests}
+          setSelectedRequest={setSelectedRequest}
+          setShowJobDetailsModal={setShowJobDetailsModal}
+        />
+        {/* Cleaner Job Details Modal */}
+        <JobDetailsModal
+          show={showJobDetailsModal}
+          onHide={() => setShowJobDetailsModal(false)}
+          selectedRequest={selectedRequest}
+          handleAcceptRequest={handleAcceptRequest}
+          handleDeclineRequest={handleDeclineRequest}
+        />
 
-        {filteredJobs.length > 0 ? (
-          <div className="row">
-            {filteredJobs.map((job) => (
-              <div className="col-md-6 mb-4" key={job.id}>
-                <div className="card shadow-sm h-100">
-                  <div className="card-body">
-                    <h5 className="card-title">{job.service_name}</h5>
-                    <p><strong>Location:</strong> {job.location}</p>
-                    <p><strong>Date & Time:</strong> {job.appointment_datetime}</p>
-                    <p><strong>Price:</strong> ${job.price}</p>
-                    <p><strong>Status:</strong> {job.status}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="alert alert-info text-center">
-            No jobs scheduled for this date.
-          </div>
-        )}
-      </>
-    ) : (
-      <p className="text-center text-muted">No accepted jobs yet.</p>
-    )}
-  </Modal.Body>
+        {/* Cleaner Payment tracking */}
+        <CleanerPaymentsModal
+          show={showCleanerPaymentsModal}
+          onHide={() => setShowCleanerPaymentsModal(false)}
+          cleanerPayments={cleanerPayments}
+        />
 
-  <Modal.Footer>
-    <Button variant="secondary" onClick={() => setShowScheduleModal(false)}>
-      Close
-    </Button>
-  </Modal.Footer>
-</Modal>
-
-{/* Homeowner Modal */}
-<Modal
-  show={showCleanerModal}
-  onHide={() => setShowCleanerModal(false)}
-  centered
-  dialogClassName="modal-xl" // Wider modal
->
-  <Modal.Header closeButton>
-  <Modal.Title>Available Cleaners</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <p className="text-muted mb-3">Browse and find available cleaners for your needs.</p>
-    <div className="row">
-      {cleaners.length > 0 ? (
-        cleaners.map((cleaner) => (
-          <div className="col-md-4 mb-4" key={cleaner.id}>
-            <div className="card shadow h-100">
-              <img
-                src={`http://localhost:5000/${cleaner.image_path || 'images/default.jpg'}`}
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = 'http://localhost:5000/images/default.jpg';
-                }}
-                alt={`${cleaner.name}'s profile`}
-                className="card-img-top"
-                style={{
-                  height: "230px",
-                  objectFit: "contain",
-                  backgroundColor: "#f8f9fa",
-                  borderTopLeftRadius: "0.5rem",
-                  borderTopRightRadius: "0.5rem"
-                }}
-                
-              />
-              <div className="card-body text-center">
-                <h5 className="card-title">{cleaner.name}</h5>
-                <p className="card-text">
-                  <strong>Experience:</strong> {cleaner.experience ? `${cleaner.experience} yrs` : "N/A"}
-                </p>
-                <p className="card-text">
-                  <strong>Preferred Areas:</strong> {cleaner.preferred_areas || "N/A"}
-                </p>
-                <div className="mt-auto">
-                  <Button
-                    variant="outline-success"
-                    size="sm"
-                    onClick={() => {
-                      setShowCleanerModal(false);
-                      handleViewProfile(cleaner);
-                    }}
-                  >
-                    View Profile
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))
-      ) : (
-        <div className="col-12">
-          <div className="alert alert-info text-center">No cleaners available.</div>
-        </div>
-      )}
-    </div>
-  </Modal.Body>
-
-  <Modal.Footer>
-    <Button variant="secondary" onClick={() => setShowCleanerModal(false)}>
-      Close
-    </Button>
-  </Modal.Footer>
-</Modal>
-
-
-   {/* Cleaner Profile Modal for HomeOwner */}
-    <Modal show={showProfileModal} onHide={() => setShowProfileModal(false)} centered size="lg">
-      <Modal.Header closeButton>
-        <Modal.Title>{selectedCleaner?.name}'s Profile</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-      {selectedCleaner ? (
-  <>
-    <div className="card shadow-sm mb-4">
-      <img
-        src={`http://localhost:5000/${selectedCleaner.image_path || 'images/default.jpg'}`}
-        onError={(e) => {
-          e.target.onerror = null;
-          e.target.src = 'http://localhost:5000/images/default.jpg';
-        }}
-        className="card-img-top"
-        alt={`${selectedCleaner.name}'s Profile`}
-        style={{
-          height: "400px",
-          objectFit: "contain",
-          borderTopLeftRadius: "0.5rem",
-          borderTopRightRadius: "0.5rem",
-        }}
+      {/*Cleaner Wallets*/}
+      <CleanerWalletModal
+        show={showCleanerWalletModal}
+        onHide={() => setShowCleanerWalletModal(false)}
+        cleanerWalletBalance={cleanerWalletBalance}
       />
-      <div className="card-body text-center">
-        <h4 className="card-title mb-3">{selectedCleaner.name}</h4>
-        <p><strong>Bio:</strong> {selectedCleaner.skills || "N/A"}</p>
-        <p><strong>Experience:</strong> {selectedCleaner.experience ? `${selectedCleaner.experience} yrs` : "N/A"}</p>
-        <p><strong>Preferred Areas:</strong> {selectedCleaner.preferred_areas || "N/A"}</p>
-        <p><strong>Availability:</strong> {selectedCleaner.availability || "N/A"}</p>
-      </div>
-    </div>
 
-    <h5 className="fw-bold mb-3">Services Offered</h5>
-
-    {selectedCleaner.services?.length > 0 ? (
-      <div className="row">
-        {selectedCleaner.services.map((service) => (
-          <div className="col-md-4 mb-4" key={service.id}>
-            <div className="card h-100 shadow-sm">
-              <div className="card-body text-center">
-                <h6 className="card-title">{service.service_name}</h6>
-                <p className="card-text">
-                  <strong>Price:</strong> ${service.price}
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    ) : (
-      <p className="text-muted">No services listed yet.</p>
-    )}
-
-    {/* Booking Section */}
-    <Form.Group className="mt-4">
-      <Form.Label>Select a Service to Book</Form.Label>
-      <Form.Select
-        value={selectedServiceName}
-        onChange={(e) => {
-          const selected = selectedCleaner.services.find(
-            (service) => service.service_name === e.target.value
-          );
-          setSelectedServiceName(selected?.service_name || "");
-          setSelectedServicePrice(selected?.price || "");
-        }}
-      >
-        <option value="">-- Please choose a service --</option>
-        {selectedCleaner.services.map((service) => (
-          <option key={service.id} value={service.service_name}>
-            {service.service_name} - ${service.price}
-          </option>
-        ))}
-      </Form.Select>
-    </Form.Group>
-
-    <Form.Group className="mt-4">
-      <Form.Label>Service Location</Form.Label>
-      <Form.Control
-        type="text"
-        placeholder="Enter location (e.g. 123 Main St)"
-        value={selectedLocation}
-        onChange={(e) => setSelectedLocation(e.target.value)}
+      {/*Schedule For Cleaner modal */}
+      <ScheduleModal
+        show={showScheduleModal}
+        onHide={() => setShowScheduleModal(false)}
+        acceptedJobs={acceptedJobs}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        filteredJobs={filteredJobs}
+        markJobAsCompleted={markJobAsCompleted}
       />
-    </Form.Group>
 
-    <Form.Group className="mt-3">
-      <Form.Label>Preferred Date & Time</Form.Label>
-      <Form.Control
-        type="datetime-local"
-        value={selectedDatetime}
-        onChange={(e) => setSelectedDatetime(e.target.value)}
-      />
-    </Form.Group>
-  </>
-) : (
-  <p>Loading profile...</p>
-)}
- </Modal.Body>
-
-      {/* ===== Footer Buttons ===== */}
-      <Modal.Footer>
-      <Button variant="secondary" onClick={() => setShowProfileModal(false)}>
-        Close
-      </Button>
-
-      <Button
-      style={{
-        backgroundColor: "#ffc107",  
-        color: "#000",               
-        border: "1px solid #ffc107"
-      }}
-      className="me-2"
-      onClick={async () => {
-        try {
-          const res = await fetch("http://localhost:5000/api/favourites", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              homeownerId: userId,
-              cleanerId: selectedCleaner.id,
-            }),
-          });
-
-          const data = await res.json();
-          if (data.success) {
-            const message =
-              data.action === "added"
-                ? "Cleaner added to your favourites!"
-                : "Cleaner removed from your favourites.";
-            toast.success(message);
-
-            // Update state directly
-            setIsFavourite(data.action === "added");
-          } else {
-            toast.error("Failed to update favourites.");
-          }
-        } catch (err) {
-          console.error("Favourite error:", err);
-        }
-      }}
-    >
-      {isFavourite ? "Saved" : "Save to Favourites"}
-    </Button>
+{/* Homeowner Main Modal */}
+    {/* Search Cleaner Modal */}
+    <SearchCleanerModal
+      show={showCleanerModal}
+      onHide={() => setShowCleanerModal(false)}
+      cleaners={cleaners}
+      fetchCleanerReviews={fetchCleanerReviews}
+      handleViewProfile={handleViewProfile}
+    />
+    {/* Cleaner Profile Modal */}
+    <CleanerProfileModal
+      show={showProfileModal}
+      onHide={() => setShowProfileModal(false)} 
+      selectedCleaner={selectedCleaner}
+      selectedServiceName={selectedServiceName}
+      selectedServicePrice={selectedServicePrice}
+      setSelectedServiceName={setSelectedServiceName}
+      setSelectedServicePrice={setSelectedServicePrice}
+      selectedLocation={selectedLocation}
+      setSelectedLocation={setSelectedLocation}
+      selectedDatetime={selectedDatetime}
+      setSelectedDatetime={setSelectedDatetime}
+      userId={userId}
+      isFavourite={isFavourite}
+      setIsFavourite={setIsFavourite}
+      handleBookCleaner={handleBookCleaner}
+    />
 
 
-        <Button
-          variant="success"
-          onClick={() => {
-            if (!selectedServiceName || !selectedServicePrice || !selectedLocation || !selectedDatetime) {
-              toast.error("Please select service, location, and date/time before booking!");
-              return;
-            }
-            handleBookCleaner(selectedCleaner);
-          }}
-        >
-          Book This Cleaner
-        </Button>
-    </Modal.Footer>
-    </Modal>
-    {/* ===== favourites for HomeOwner ===== */}
-    <Modal show={showFavouritesModal} onHide={() => setShowFavouritesModal(false)} centered size="lg">
-      <Modal.Header closeButton>
-        <Modal.Title>My Favourite Cleaners</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-  <p className="text-muted mb-3">Here are the cleaners you've saved to favourites.</p>
+    {/* favourites modal for HomeOwner */}
+    <FavouritesModal
+      show={showFavouritesModal}
+      onHide={() => setShowFavouritesModal(false)}
+      favourites={favourites}
+      handleViewProfile={handleViewProfile}
+    />
 
-  {favourites.length > 0 ? (
-    <div className="row">
-      {favourites.map((cleaner) => (
-        <div className="col-md-4 mb-4" key={cleaner.id}> {/* <-- 3 columns per row */}
-          <div className="card shadow-sm h-100">
-            <img
-              src={`http://localhost:5000/${cleaner.image_path || "images/default.jpg"}`}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "http://localhost:5000/images/default.jpg";
-              }}
-              className="card-img-top"
-              alt={`${cleaner.name}'s Profile`}
-              style={{
-                height: "220px",
-                objectFit: "cover",
-                borderTopLeftRadius: "0.5rem",
-                borderTopRightRadius: "0.5rem",
-              }}
-            />
-            <div className="card-body text-center">
-              <h5 className="card-title">{cleaner.name}</h5>
-              <p className="card-text mb-1">
-                <strong>Experience:</strong> {cleaner.experience ? `${cleaner.experience} yrs` : "N/A"}
-              </p>
-              <p className="card-text mb-2">
-                <strong>Preferred Areas:</strong> {cleaner.preferred_areas || "N/A"}
-              </p>
-              <Button
-                variant="outline-success"
-                size="sm"
-                onClick={() => {
-                  setShowFavouritesModal(false);
-                  handleViewProfile(cleaner);
-                }}
-              >
-                View Profile
-              </Button>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  ) : (
-    <div className="alert alert-info text-center">You haven't saved any favourites yet.</div>
-  )}
-</Modal.Body>
-
-      <Modal.Footer>
-        <Button variant="secondary" onClick={() => setShowFavouritesModal(false)}>
-          Close
-        </Button>
-      </Modal.Footer>
-    </Modal>
-    {/* === Modal for Accepted Bookings === */}
-    <Modal show={showAcceptedModal} onHide={() => setShowAcceptedModal(false)} centered size="lg">
-      <Modal.Header closeButton>
-        <Modal.Title>Confirmed Jobs</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <p className="text-muted mb-3">These jobs have been accepted by your selected cleaners.</p>
-        <table className="table table-bordered shadow-sm">
-          <thead className="table-light">
-            <tr>
-              <th>Cleaner</th>
-              <th>Service</th>
-              <th>Price</th>
-              <th>Location</th>
-              <th>Date & Time</th>
-              <th>Payment</th>
-            </tr>
-          </thead>
-          <tbody>
-            {acceptedBookings.length > 0 ? (
-              acceptedBookings.map((job) => (
-                <tr key={job.id}>
-                  <td>{job.cleaner_name}</td>
-                  <td>{job.service_name}</td>
-                  <td>${job.price}</td>
-                  <td>{job.location}</td>
-                  <td>{job.appointment_datetime}</td>
-                  <td>
-                    {job.is_paid ? (
-                      <span className="text-success">Paid</span>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline-primary"
-                        onClick={() => handlePayCleaner(job)}
-                      >
-                        Pay Now
-                      </Button>
-                    )}
-                  </td>
-
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="5" className="text-center">No accepted jobs yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={() => setShowAcceptedModal(false)}>
-          Close
-        </Button>
-      </Modal.Footer>
-    </Modal>
-    {/* ===== Wallet Modal for Homeowner ===== */}
-    <Modal show={showWalletModal} onHide={() => setShowWalletModal(false)} centered>
-      <Modal.Header closeButton>
-        <Modal.Title>My Wallet</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
-        <p className="text-muted mb-3">Current Balance: ${walletBalance.toFixed(2)}</p>
-
-        <Form>
-          <Form.Group>
-            <Form.Label>Top-Up Amount ($)</Form.Label>
-            <Form.Control
-              type="number"
-              placeholder="Enter amount"
-              value={topUpAmount}
-              onChange={(e) => setTopUpAmount(e.target.value)}
-              min={1}
-            />
-          </Form.Group>
-        </Form>
-      </Modal.Body>
-      <Modal.Footer>
-        <Button variant="secondary" onClick={() => setShowWalletModal(false)}>
-          Close
-        </Button>
-        <Button variant="primary" onClick={handleTopUp}>
-      Top Up
-    </Button>
-
-      </Modal.Footer>
-    </Modal>
-
-
+    {/*viewBookings modal for homeowner */}
+    <ViewBookings
+      show={showAcceptedModal}
+      onHide={() => setShowAcceptedModal(false)}
+      acceptedBookings={acceptedBookings}
+      handlePayCleaner={handlePayCleaner}
+      setSelectedJob={setSelectedJob}
+      setShowRatingModal={setShowRatingModal}
+    />
+    {/*Homeowner Wallet modal */}
+    <WalletModal
+      show={showWalletModal}
+      onHide={() => setShowWalletModal(false)}
+      walletBalance={walletBalance}
+      topUpAmount={topUpAmount}
+      setTopUpAmount={setTopUpAmount}
+      handleTopUp={handleTopUp}
+    />
+    {/* homeowner Preferences Modal */}
+    <PreferencesModal
+      show={showPreferencesModal}
+      onHide={() => setShowPreferencesModal(false)}
+      preferences={preferences}
+      setPreferences={setPreferences}
+      savePreferences={savePreferences}
+    />
+    {/* Show ratings for Cleaner*/}
+    <RateCleanerModal
+      show={showRatingModal}
+      onClose={() => setShowRatingModal(false)}
+      selectedJob={selectedJob}
+      onSubmit={rateCleaner}
+    />
+    {/* Show cleaner reviews*/}
+    <ReviewsModal
+      show={showReviewsModal}
+      onHide={() => setShowReviewsModal(false)}
+      cleanerName={selectedCleaner?.name}
+      selectedCleanerReviews={selectedCleanerReviews}
+    />
+    {/* homeowner past purchases history*/}
+    <ServiceHistoryModal
+      show={showServiceHistory}
+      onHide={() => setShowServiceHistory(false)}
+      completedBookings={completedBookings}
+    />
 
     </div>
   );
