@@ -6,7 +6,7 @@ class PaymentController {
     }
   
     // --- Payment-related methods ---
-  
+    //add payment for homeowner
     addPaymentRecord(req, res) {
       const { bookingId, amount, method, status } = req.body;
       const sql = `INSERT INTO payments (booking_id, amount, method, status, created_at) VALUES (?, ?, ?, ?, datetime('now'))`;
@@ -19,7 +19,7 @@ class PaymentController {
         res.json({ success: true, paymentId: this.lastID });
       });
     }
-  
+    // get payment from homeowner to cleaner
     getPaymentsByCleaner(req, res) {
         const cleanerId = req.params.cleanerId;
       
@@ -49,7 +49,7 @@ class PaymentController {
       
   
     // --- Wallet-related methods ---
-  
+    // get wallet balance ammount
     getWalletBalance(req, res) {
       const userId = req.params.userId;
       const sql = `SELECT balance FROM wallets WHERE user_id = ?`;
@@ -66,7 +66,7 @@ class PaymentController {
         }
       });
     }
-  
+    // for homeowner to top up wallet
     topUpWallet(req, res) {
       const { userId, amount } = req.body;
   
@@ -86,6 +86,7 @@ class PaymentController {
         res.json({ success: true });
       });
     }
+    // add paymenet to homeowner wallet
     addPaymentRecord(req, res) {
         const { bookingId, amount, method, status, userId } = req.body;
       
@@ -182,7 +183,7 @@ class PaymentController {
         });
       }
       
-      
+      // cleaner to get total earnings from paymenet
       getCleanerEarnings(req, res) {
         const cleanerId = req.params.cleanerId;
       
