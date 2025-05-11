@@ -31,7 +31,45 @@ const PreferencesModal = ({
             <option value="West">West</option>
           </Form.Select>
         </Form.Group>
+        {/* Preferred Minimum Rating */}
+          <Form.Group className="mt-3">
+            <Form.Label>Minimum Cleaner Rating</Form.Label>
+            <Form.Select
+              value={preferences.minimum_rating || 0}
+              onChange={(e) =>
+                setPreferences({ ...preferences, minimum_rating: parseFloat(e.target.value) })
+              }
+            >
+              <option value={0}>No preference</option>
+              <option value={5}>5 stars</option>
+              <option value={4}>4 stars & up</option>
+              <option value={3}>3 stars & up</option>
+              <option value={2}>2 stars & up</option>
+              <option value={1}>1 star & up</option>
+            </Form.Select>
+          </Form.Group>
 
+          <Form.Group className="mt-3">
+            <Form.Label>Price Range</Form.Label>
+            <div className="d-flex gap-2">
+              <Form.Control
+                type="number"
+                placeholder="Min"
+                value={preferences.min_price || ""}
+                onChange={(e) =>
+                  setPreferences({ ...preferences, min_price: e.target.value })
+                }
+              />
+              <Form.Control
+                type="number"
+                placeholder="Max"
+                value={preferences.max_price || ""}
+                onChange={(e) =>
+                  setPreferences({ ...preferences, max_price: e.target.value })
+                }
+              />
+            </div>
+          </Form.Group>
         {/* Other Notes */}
         <Form.Group className="mt-3">
           <Form.Label>Other Notes</Form.Label>
@@ -44,6 +82,7 @@ const PreferencesModal = ({
             }
           />
         </Form.Group>
+
       </Modal.Body>
 
       <Modal.Footer>
