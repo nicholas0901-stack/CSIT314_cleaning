@@ -20,7 +20,20 @@ const JobDetailsModal = ({
             <p><strong>Service:</strong> {selectedRequest.service_name}</p>
             <p><strong>Price:</strong> ${selectedRequest.price}</p>
             <p><strong>Location:</strong> {selectedRequest.location || "N/A"}</p>
-            <p><strong>Date & Time:</strong> {selectedRequest.appointment_datetime || "N/A"}</p>
+            <p>
+              <strong>Date & Time:</strong>{" "}
+              {selectedRequest.appointment_datetime
+                ? new Date(selectedRequest.appointment_datetime).toLocaleString("en-SG", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                    timeZone: "Asia/Singapore"
+                  })
+                : "N/A"}
+            </p>
             <p><strong>Status:</strong> {selectedRequest.status}</p>
           </>
         ) : (
