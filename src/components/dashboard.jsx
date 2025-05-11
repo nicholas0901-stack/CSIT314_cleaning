@@ -19,7 +19,7 @@ import CleanerPaymentsModal from "./CleanerModal/CleanerPaymentsModal";
 import CleanerWalletModal from "./CleanerModal/CleanerWalletModal";
 import ScheduleModal from "./CleanerModal/ScheduleModal";
 import ManageUsersModal from './AdminModal/ManageUsersModal';
-
+import PlatformManagementModal from './PlatformManagementModal';
 
 const Dashboard = () => {
   const location = useLocation();
@@ -65,6 +65,7 @@ const Dashboard = () => {
   const [selectedCleanerReviews, setSelectedCleanerReviews] = useState([]);
   const [showServiceHistory, setShowServiceHistory] = useState(false);
   const [completedBookings, setCompletedBookings] = useState([]);
+  const [showPlatformModal, setShowPlatformModal] = useState(false);
 
    
 
@@ -252,7 +253,17 @@ return jobDate === selectedDate.toDateString();
   const fetchCleaners = async () => {
     try {
       const area = preferences.preferred_area;
-      const url = area ? `http://localhost:5000/api/cleaners?preferredArea=${encodeURIComponent(area)}` : `http://localhost:5000/api/cleaners`;
+      const rating = preferences.minimum_rating;
+      const minPrice = preferences.min_price;
+      const maxPrice = preferences.max_price;
+  
+      const queryParams = new URLSearchParams();
+      if (area) queryParams.append("preferredArea", area);
+      if (rating && rating > 0) queryParams.append("minimumRating", rating);
+      if (minPrice != null) queryParams.append("minPrice", minPrice);
+      if (maxPrice != null) queryParams.append("maxPrice", maxPrice);
+  
+      const url = `http://localhost:5000/api/cleaners?${queryParams.toString()}`;
   
       const res = await fetch(url);
       const data = await res.json();
@@ -260,9 +271,11 @@ return jobDate === selectedDate.toDateString();
         setCleaners(data.cleaners);
       }
     } catch (error) {
-      console.error('Failed to fetch cleaners:', error);
+      console.error("Failed to fetch cleaners:", error);
     }
   };
+  
+  
   const handleViewProfile = async (cleaner) => {
     try {
       const res = await fetch(
@@ -488,7 +501,10 @@ useEffect(() => {
     fetchWalletBalance();
   }
 }, [showWalletModal]);
-  
+useEffect(() => {
+  console.log("User ID from component:", userId);
+}, []);
+
 const handlePayCleaner = async (job) => {
   try {
     const res = await fetch("http://localhost:5000/api/payments", {
@@ -512,7 +528,7 @@ const handlePayCleaner = async (job) => {
       fetchAcceptedBookings();    // if you want to update the booking table
       fetchCleanerPayments();     // this should update the records in the modal
     } else {
-      toast.error("Payment failed.");
+      toast.error("Payment failed. Insufficent Funds !");
     }
   } catch (error) {
     console.error("Payment error:", error);
@@ -598,6 +614,17 @@ const rateCleaner = async (bookingId, rating, comment) => {
   }
 };
 
+const handleGenerateReport = async () => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/admin/reports?reportType=${reportType}`);
+    const data = await res.json();
+    if (data.success) {
+      setReportData(data.report); // display in modal or table
+    }
+  } catch (err) {
+    console.error("Error generating report:", err);
+  }
+};
 
 
 
@@ -621,13 +648,14 @@ const markJobAsCompleted = async (bookingId) => {
 };
 
 
-const fetchCleanerReviews = async (cleanerId) => {
+const fetchCleanerReviews = async (cleanerId, cleanerName) => {
   try {
     const res = await fetch(`http://localhost:5000/api/cleaners/${cleanerId}/reviews`);
     const data = await res.json();
 
     if (data.success) {
       setSelectedCleanerReviews(data.reviews);
+      setSelectedCleaner(prev => ({ ...(prev || {}), name: cleanerName })); // ✅ store the name
       setShowReviewsModal(true);
     } else {
       toast.error("Failed to fetch reviews.");
@@ -637,6 +665,7 @@ const fetchCleanerReviews = async (cleanerId) => {
     toast.error("An error occurred while fetching reviews.");
   }
 };
+
 
 const fetchCompletedServices = async () => {
   try {
@@ -947,7 +976,9 @@ const [userError, setUserError] = useState("");
                   <div className="card-body">
                     <h5 className="card-title">Platform Management</h5>
                     <p className="card-text">Manage services and generate reports.</p>
-                    <a href="/admin/platform" className="btn btn-outline-danger btn-sm">Platform Tools</a>
+                    <Button variant="outline-danger" size="sm" onClick={() => setShowPlatformModal(true)}>
+                      Platform Tools
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -975,6 +1006,11 @@ const [userError, setUserError] = useState("");
             setEditPassword={setEditPassword}
             editRole={editRole}
             setEditRole={setEditRole}
+          />
+
+          <PlatformManagementModal
+            show={showPlatformModal}
+            onHide={() => setShowPlatformModal(false)}
           />
 
 {/* Cleaner Main Modal */}
@@ -1111,9 +1147,9 @@ const [userError, setUserError] = useState("");
     <ReviewsModal
       show={showReviewsModal}
       onHide={() => setShowReviewsModal(false)}
-      cleanerName={selectedCleaner?.name}
       selectedCleanerReviews={selectedCleanerReviews}
     />
+
     {/* homeowner past purchases history*/}
     <ServiceHistoryModal
       show={showServiceHistory}
