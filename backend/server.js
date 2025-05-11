@@ -9,9 +9,7 @@ const CleanerController = require('./CleanerController');
 const BookingController = require('./BookingController');
 const PaymentController = require('./PaymentController');
 const PreferenceController = require('./PreferenceController');
-
-
-
+const AdminController = require('./AdminController');
 
 const app = express();
 app.use(cors());
@@ -46,6 +44,7 @@ const cleanerController = new CleanerController(db);
 const bookingController = new BookingController(db);
 const paymentController = new PaymentController(db);
 const preferenceController = new PreferenceController(db);
+const adminController = new AdminController(db);
 
 
 
@@ -84,6 +83,7 @@ app.get('/api/bookings/completed/:homeownerId', (req, res) => bookingController.
 
 // Cleaner marks booking as completed
 app.put('/api/bookings/:bookingId/complete', (req, res) => bookingController.markAsCompleted(req, res));
+app.put("/api/cleaner/services/:id", (req, res) =>cleanerController.updateService(req, res));
 
 // Homeowner rates completed booking
 app.post('/api/bookings/:bookingId/rate', (req, res) => bookingController.rateCompletedJob(req, res));
@@ -104,6 +104,13 @@ app.get("/api/wallet/:userId", (req, res) => paymentController.getWalletBalance(
 // Preference routes
 app.get('/api/preferences/:homeownerId', (req, res) => preferenceController.getPreferences(req, res));
 app.post('/api/preferences/:homeownerId', (req, res) => preferenceController.savePreferences(req, res));
+
+//Report routes
+app.get("/api/admin/reports", (req, res) => adminController.getReport(req, res));
+app.get('/api/admin/services', (req, res) => adminController.getAllCleanerServices(req, res));
+
+app.delete('/api/cleaner/services/:id', (req, res) =>adminController.deleteService(req, res));
+app.post('/api/admin/services', (req, res) => adminController.addService(req, res));
 
 // ===================== SERVER ===================== //
 
