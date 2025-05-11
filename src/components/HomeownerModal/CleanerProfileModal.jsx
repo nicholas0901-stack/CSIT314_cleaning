@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 
 const CleanerProfileModal = ({
   show,
-  onHide, // ✅ use onHide instead of onClose
+  onHide, 
   selectedCleaner,
   selectedServiceName,
   setSelectedServiceName,
@@ -102,15 +102,15 @@ const CleanerProfileModal = ({
               <Form.Select
                 value={selectedServiceName}
                 onChange={(e) => {
-                  const selected = selectedCleaner.services.find(
+                  const selected = selectedCleaner.services?.find(
                     (service) => service.service_name === e.target.value
                   );
                   setSelectedServiceName(selected?.service_name || "");
                   setSelectedServicePrice(selected?.price || "");
                 }}
-              >
+                >
                 <option value="">-- Please choose a service --</option>
-                {selectedCleaner.services.map((service) => (
+                {selectedCleaner.services?.map((service) => (
                   <option key={service.id} value={service.service_name}>
                     {service.service_name} - ${service.price}
                   </option>
