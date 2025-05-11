@@ -614,20 +614,6 @@ const rateCleaner = async (bookingId, rating, comment) => {
   }
 };
 
-const handleGenerateReport = async () => {
-  try {
-    const res = await fetch(`http://localhost:5000/api/admin/reports?reportType=${reportType}`);
-    const data = await res.json();
-    if (data.success) {
-      setReportData(data.report); // display in modal or table
-    }
-  } catch (err) {
-    console.error("Error generating report:", err);
-  }
-};
-
-
-
 // mark complete jobs
 const markJobAsCompleted = async (bookingId) => {
   try {
