@@ -113,9 +113,8 @@ class CleanerController {
     }
     
   
-    // Get all cleaners with profiles
     getAllCleaners(req, res) {
-      const { preferredArea } = req.query;
+      const { preferredArea, minimumRating, minPrice, maxPrice } = req.query;
     
       let sql = `
         SELECT 
@@ -123,21 +122,24 @@ class CleanerController {
           users.name, 
           users.email, 
           users.image_path, 
-          cleaner_profiles.skills, 
-          cleaner_profiles.experience, 
-          cleaner_profiles.preferred_areas, 
-          cleaner_profiles.availability,
-          AVG(bookings.rating) AS average_rating
+          cp.skills, 
+          cp.experience, 
+          cp.preferred_areas, 
+          cp.availability,
+          ROUND(AVG(b.rating), 2) AS average_rating,
+          MIN(s.price) AS min_service_price,
+          MAX(s.price) AS max_service_price
         FROM users
-        LEFT JOIN cleaner_profiles ON users.id = cleaner_profiles.cleaner_id
-        LEFT JOIN bookings ON users.id = bookings.cleaner_id AND bookings.completed = 1 AND bookings.rating IS NOT NULL
+        LEFT JOIN cleaner_profiles cp ON users.id = cp.cleaner_id
+        LEFT JOIN bookings b ON users.id = b.cleaner_id AND b.completed = 1 AND b.rating IS NOT NULL
+        LEFT JOIN services s ON users.id = s.cleaner_id
         WHERE users.role = 'Cleaner'
       `;
     
       const params = [];
     
       if (preferredArea) {
-        sql += ` AND cleaner_profiles.preferred_areas = ?`;
+        sql += ` AND cp.preferred_areas = ?`;
         params.push(preferredArea);
       }
     
@@ -146,16 +148,29 @@ class CleanerController {
       this.db.all(sql, params, (err, rows) => {
         if (err) {
           console.error('Get filtered cleaners error:', err.message);
-          res.status(500).json({ success: false });
-        } else {
-          const cleaners = rows.map(c => ({
-            ...c,
-            average_rating: c.average_rating ? parseFloat(c.average_rating).toFixed(1) : null
-          }));
-          res.json({ success: true, cleaners });
+          return res.status(500).json({ success: false });
         }
+    
+        let filtered = rows;
+    
+        if (minimumRating) {
+          filtered = filtered.filter(c => parseFloat(c.average_rating || 0) >= parseFloat(minimumRating));
+        }
+    
+        if (minPrice !== undefined) {
+          filtered = filtered.filter(c => parseFloat(c.min_service_price || 0) >= parseFloat(minPrice));
+        }
+    
+        if (maxPrice !== undefined) {
+          filtered = filtered.filter(c => parseFloat(c.max_service_price || 0) <= parseFloat(maxPrice));
+        }
+    
+        res.json({ success: true, cleaners: filtered });
       });
     }
+    
+    
+    
     
     
       // Get all cleaners profiles with services and reviews
@@ -357,7 +372,20 @@ class CleanerController {
         res.json({ success: true, bookings: rows });
       });
     }
-    
+    // In CleanerController
+    updateService(req, res) {
+      const { service_name, price } = req.body;
+      const { id } = req.params;
+
+      const sql = `UPDATE services SET service_name = ?, price = ? WHERE id = ?`;
+      this.db.run(sql, [service_name, price, id], function (err) {
+        if (err) {
+          console.error("Update service error:", err.message);
+          return res.status(500).json({ success: false });
+        }
+        res.json({ success: true });
+      });
+    }
   }
   
   module.exports = CleanerController;
