@@ -60,7 +60,20 @@ const ScheduleModal = ({
                       <div className="card-body">
                         <h5 className="card-title">{job.service_name}</h5>
                         <p><strong>Location:</strong> {job.location}</p>
-                        <p><strong>Date & Time:</strong> {job.appointment_datetime}</p>
+                        <p>
+                          <strong>Date & Time:</strong>{" "}
+                          {job.appointment_datetime
+                            ? new Date(job.appointment_datetime).toLocaleString("en-SG", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                                hour12: true,
+                                timeZone: "Asia/Singapore",
+                              })
+                            : "N/A"}
+                        </p>
                         <p><strong>Price:</strong> ${job.price}</p>
                         <p><strong>Status:</strong> {job.status}</p>
 
