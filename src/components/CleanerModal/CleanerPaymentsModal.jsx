@@ -26,7 +26,18 @@ const CleanerPaymentsModal = ({ show, onHide, cleanerPayments }) => {
                   <td>{pmt.service_name}</td>
                   <td>${pmt.amount}</td>
                   <td>{pmt.status}</td>
-                  <td>{pmt.created_at}</td>
+                  <td>
+                    {new Date(pmt.created_at).toLocaleString("en-SG", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: true,
+                      timeZone: "Asia/Singapore",
+                    })}
+                  </td>
                 </tr>
               ))}
             </tbody>
