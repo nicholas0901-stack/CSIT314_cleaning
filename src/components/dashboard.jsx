@@ -20,6 +20,7 @@ import CleanerWalletModal from "./CleanerModal/CleanerWalletModal";
 import ScheduleModal from "./CleanerModal/ScheduleModal";
 import ManageUsersModal from './AdminModal/ManageUsersModal';
 import PlatformManagementModal from './PlatformManagementModal';
+import NotificationModal from "./NotificationModal";
 
 const Dashboard = () => {
   const location = useLocation();
@@ -66,8 +67,187 @@ const Dashboard = () => {
   const [showServiceHistory, setShowServiceHistory] = useState(false);
   const [completedBookings, setCompletedBookings] = useState([]);
   const [showPlatformModal, setShowPlatformModal] = useState(false);
+const [latestBookingStatus, setLatestBookingStatus] = useState({});
+const [notifications, setNotifications] = useState([]);
+const [showNotificationModal, setShowNotificationModal] = useState(false);
+const [cleanerNotifications, setCleanerNotifications] = useState([]);
+const [latestCleanerStatus, setLatestCleanerStatus] = useState({});
+const [showCleanerNotificationModal, setShowCleanerNotificationModal] = useState(false);
 
    
+const pollBookingStatusUpdates = async () => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/bookings/all/${userId}`);
+    const data = await res.json();
+
+    if (data.success) {
+      const updatedStatusMap = { ...latestBookingStatus };
+      const newNotifications = [];
+
+     data.bookings.forEach((booking) => {
+  const prevStatus = latestBookingStatus[booking.id];
+
+  if (
+    (prevStatus && prevStatus !== booking.status) ||
+    (!prevStatus && ["Declined", "Accepted", "Completed"].includes(booking.status))
+  ) {
+    const cleanerName = booking.cleaner_name || "Cleaner";  
+    let message = "";
+
+    if (booking.status === "Accepted") {
+      message = `${cleanerName} accepted your booking for ${booking.service_name}`;
+      toast.success(message);
+    } else if (booking.status === "Declined") {
+      message = `${cleanerName} declined your booking for ${booking.service_name}`;
+      toast.error(message);
+    } else if (booking.status === "Completed") {
+      message = `${cleanerName} completed the job for ${booking.service_name}. Please proceed for payment.`;
+      toast.success(message);
+    }
+
+    if (message) {
+      newNotifications.push({
+        id: Date.now() + Math.random(),
+        message,
+        datetime: new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore" }),
+      });
+    }
+  }
+
+  updatedStatusMap[booking.id] = booking.status;
+});
+
+
+      if (newNotifications.length > 0) {
+        setNotifications((prev) => [...newNotifications, ...prev]);
+      }
+
+      setLatestBookingStatus(updatedStatusMap);
+    }
+  } catch (error) {
+    console.error("Failed to poll booking statuses:", error);
+  }
+};
+
+const pollCleanerNotifications = async () => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/bookings/cleaner/all/${userId}`);
+    const data = await res.json();
+
+    if (data.success) {
+      const newNotes = [];
+      const updatedStatusMap = { ...latestCleanerStatus };
+
+      data.bookings.forEach((booking) => {
+        const prev = latestCleanerStatus[booking.id] || {};
+        const homeownerName = booking.homeowner_name || "Homeowner";
+
+        let message = null;
+
+        // New booking request
+        if (!prev.status && booking.status === "Pending") {
+          message = `${homeownerName} has requested a job: ${booking.service_name}.`;
+          toast.success(message);
+        }
+
+        // New payment
+        if (!prev.is_paid && booking.is_paid) {
+          message = `${homeownerName} has completed payment for ${booking.service_name}.`;
+          toast.success(message);
+        }
+
+        // New rating (e.g., rating changed from null to 4 or 5)
+        if (!prev.rating && booking.rating) {
+          message = `${homeownerName} rated you ${booking.rating}⭐ for ${booking.service_name}.`;
+          toast.success(message);
+        }
+
+        if (message) {
+          const note = {
+            id: Date.now() + Math.random(),
+            message,
+            datetime: new Date().toLocaleString("en-SG", { timeZone: "Asia/Singapore" }),
+          };
+          newNotes.push(note);
+        }
+
+        // Update tracking state
+        updatedStatusMap[booking.id] = {
+          status: booking.status,
+          is_paid: booking.is_paid,
+          rating: booking.rating,
+        };
+      });
+
+      if (newNotes.length > 0) {
+        setCleanerNotifications((prev) => [...newNotes, ...prev]);
+      }
+
+      setLatestCleanerStatus(updatedStatusMap);
+    }
+  } catch (err) {
+    console.error("Cleaner poll error:", err);
+  }
+};
+
+
+
+
+
+
+
+useEffect(() => {
+  const initializeStatusMap = async () => {
+    try {
+      if (role === "Homeowner") {
+        const res = await fetch(`http://localhost:5000/api/bookings/all/${userId}`);
+        const data = await res.json();
+        if (data.success) {
+          const map = {};
+          data.bookings.forEach(b => map[b.id] = b.status);
+          setLatestBookingStatus(map);
+        }
+      } else if (role === "Cleaner") {
+        const res = await fetch(`http://localhost:5000/api/bookings/cleaner/${userId}/accepted`);
+        const data = await res.json();
+        if (data.success) {
+          const map = {};
+          data.bookings.forEach(b => {
+            map[b.id] = {
+              status: b.status,
+              paid: b.is_paid,
+            };
+          });
+          setLatestBookingStatus(map);
+        }
+      }
+    } catch (err) {
+      console.error("Initial status load failed", err);
+    }
+  };
+
+  if (role === "Homeowner" || role === "Cleaner") initializeStatusMap();
+}, [role]);
+
+
+useEffect(() => {
+  let interval;
+
+  if (role === "Homeowner") {
+    interval = setInterval(() => {
+      pollBookingStatusUpdates(); // already implemented
+    }, 10000);
+  } else if (role === "Cleaner") {
+    interval = setInterval(() => {
+      pollCleanerNotifications(); // function that checks for new bookings/payment
+    }, 10000);
+  }
+
+  return () => clearInterval(interval);
+}, [role, latestBookingStatus, latestCleanerStatus]);
+
+
+
 
   const [tempProfile, setTempProfile] = useState({
     skills: '',
@@ -709,16 +889,37 @@ const [userError, setUserError] = useState("");
 
   return (
     <div className="min-vh-100 bg-light">
-      {/* Navbar */}
+     {/* Navbar */}
       <nav className="navbar navbar-expand-lg navbar-dark bg-dark px-4">
         <a className="navbar-brand fw-bold" href="/">TeamABC Dashboard</a>
         <div className="collapse navbar-collapse">
-          <ul className="navbar-nav ms-auto">
+          <ul className="navbar-nav ms-auto align-items-center">
+            {(role === "Homeowner" || role === "Cleaner") && (
+              <li className="nav-item me-3">
+                <button
+                  className="btn btn-sm btn-outline-light position-relative"
+                  onClick={() =>
+                    role === "Homeowner"
+                      ? setShowNotificationModal(true)
+                      : setShowCleanerNotificationModal(true)
+                  }
+                >
+                  <i className="bi bi-bell"></i>
+                  {((role === "Homeowner" && notifications.length > 0) ||
+                    (role === "Cleaner" && cleanerNotifications.length > 0)) && (
+                    <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                      {role === "Homeowner" ? notifications.length : cleanerNotifications.length}
+                    </span>
+                  )}
+                </button>
+              </li>
+            )}
             <li className="nav-item"><a className="nav-link" href="/">Home</a></li>
             <li className="nav-item"><a className="nav-link" href="/login">Logout</a></li>
           </ul>
         </div>
       </nav>
+
 
       {/* Main Content */}
       <div className="container py-5">
@@ -1059,6 +1260,17 @@ const [userError, setUserError] = useState("");
         markJobAsCompleted={markJobAsCompleted}
       />
 
+       {/*Cleaner modal notification*/}
+     <NotificationModal
+      show={showCleanerNotificationModal}
+      onHide={() => setShowCleanerNotificationModal(false)}
+      notifications={cleanerNotifications}
+      setNotifications={setCleanerNotifications}
+    />
+
+
+
+
 {/* Homeowner Main Modal */}
     {/* Search Cleaner Modal */}
     <SearchCleanerModal
@@ -1142,6 +1354,17 @@ const [userError, setUserError] = useState("");
       onHide={() => setShowServiceHistory(false)}
       completedBookings={completedBookings}
     />
+    {/* homeowner notification Modal*/}
+    <NotificationModal
+      show={showNotificationModal}
+      onHide={() => setShowNotificationModal(false)}
+      notifications={notifications}
+      setNotifications={setNotifications}
+    />
+
+
+
+
 
     </div>
   );
