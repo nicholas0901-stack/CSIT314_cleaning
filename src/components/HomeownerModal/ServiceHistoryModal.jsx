@@ -24,7 +24,19 @@ const ServiceHistoryModal = ({ show, onHide, completedBookings }) => {
                   <td>{job.cleaner_name}</td>
                   <td>{job.service_name}</td>
                   <td>${job.price}</td>
-                  <td>{job.appointment_datetime}</td>
+                  <td>
+                    {job.appointment_datetime
+                      ? new Date(job.appointment_datetime).toLocaleString("en-SG", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                          hour12: true,
+                          timeZone: "Asia/Singapore",
+                        })
+                      : "N/A"}
+                  </td>
                 </tr>
               ))}
             </tbody>
