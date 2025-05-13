@@ -112,6 +112,9 @@ app.get('/api/admin/services', (req, res) => adminController.getAllCleanerServic
 app.delete('/api/cleaner/services/:id', (req, res) =>adminController.deleteService(req, res));
 app.post('/api/admin/services', (req, res) => adminController.addService(req, res));
 
+app.get('/api/bookings/all/:homeownerId', (req, res) => bookingController.getAllBookingsForHomeowner(req, res));
+app.get('/api/bookings/cleaner/all/:cleanerId', (req, res) => bookingController.getAllBookingsForCleaner(req, res));
+
 // ===================== SERVER ===================== //
 
 const PORT = 5000;
