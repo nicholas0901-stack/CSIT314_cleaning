@@ -9,7 +9,8 @@ class PaymentController {
     //add payment for homeowner
     addPaymentRecord(req, res) {
       const { bookingId, amount, method, status } = req.body;
-      const sql = `INSERT INTO payments (booking_id, amount, method, status, created_at) VALUES (?, ?, ?, ?, datetime('now'))`;
+      const sql = `INSERT INTO payments (booking_id, amount, method, status, created_at)
+             VALUES (?, ?, ?, ?, datetime('now', 'localtime'))`;
   
       this.db.run(sql, [bookingId, amount, method, status], function (err) {
         if (err) {
@@ -92,23 +93,25 @@ class PaymentController {
       
         const checkBalanceSql = `SELECT balance FROM wallets WHERE user_id = ?`;
         const deductBalanceSql = `
-          UPDATE wallets SET balance = balance - ?, updated_at = datetime('now')
+          UPDATE wallets 
+          SET balance = balance - ?, 
+              updated_at = datetime('now', 'localtime')
           WHERE user_id = ? AND balance >= ?
         `;
         const insertPaymentSql = `
           INSERT INTO payments (booking_id, amount, method, status, created_at)
-          VALUES (?, ?, ?, ?, datetime('now'))
+          VALUES (?, ?, ?, ?, datetime('now', 'localtime'))
         `;
         const markBookingPaidSql = `
           UPDATE bookings SET is_paid = 1 WHERE id = ?
         `;
         const getCleanerSql = `SELECT cleaner_id FROM bookings WHERE id = ?`;
-        const creditCleanerSql = `
+        const creditCleanerSql =  `
           INSERT INTO wallets (user_id, balance, updated_at)
-          VALUES (?, ?, datetime('now'))
+          VALUES (?, ?, datetime('now', 'localtime'))
           ON CONFLICT(user_id) DO UPDATE 
           SET balance = balance + excluded.balance,
-              updated_at = datetime('now')
+              updated_at = datetime('now', 'localtime')
         `;
         const insertTransactionSql = `
           INSERT INTO transactions (user_id, type, amount, description)
