@@ -199,7 +199,46 @@ class BookingController {
                 res.json({ success: true, bookings: rows });
               });
             }
-      
+            
+            // Get booking status update for homeowner 
+            getAllBookingsForHomeowner(req, res) {
+              const { homeownerId } = req.params;
+              const sql = `
+                SELECT b.*, u.name as cleaner_name
+                FROM bookings b
+                JOIN users u ON b.cleaner_id = u.id
+                WHERE b.homeowner_id = ?
+                ORDER BY b.created_at DESC
+              `;
+              this.db.all(sql, [homeownerId], (err, rows) => {
+                if (err) {
+                  console.error("Fetch all bookings error:", err.message);
+                  return res.status(500).json({ success: false });
+                }
+                res.json({ success: true, bookings: rows });
+              });
+            }
+            
+            getAllBookingsForCleaner(req, res) {
+              const { cleanerId } = req.params;
+              const sql = `
+                SELECT b.*, u.name AS homeowner_name
+                FROM bookings b
+                JOIN users u ON b.homeowner_id = u.id
+                WHERE b.cleaner_id = ?
+                ORDER BY b.created_at DESC
+              `;
+
+              this.db.all(sql, [cleanerId], (err, rows) => {
+                if (err) {
+                  console.error("Fetch cleaner all bookings error:", err.message);
+                  return res.status(500).json({ success: false });
+                }
+                res.json({ success: true, bookings: rows });
+              });
+            }
+
+
   }
   
 
