@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { Modal, Button, Form } from "react-bootstrap";
+import { Button} from "react-bootstrap";
 import { toast } from 'react-hot-toast';
 import 'react-calendar/dist/Calendar.css';
 import RateCleanerModal from "./HomeownerModal/RateCleanerModal";
@@ -116,8 +116,6 @@ const pollBookingStatusUpdates = async () => {
 
   updatedStatusMap[booking.id] = booking.status;
 });
-
-
       if (newNotifications.length > 0) {
         setNotifications((prev) => [...newNotifications, ...prev]);
       }
@@ -227,7 +225,7 @@ useEffect(() => {
   };
 
   if (role === "Homeowner" || role === "Cleaner") initializeStatusMap();
-}, [role]);
+}, [role, userId]);
 
 
 useEffect(() => {
@@ -305,36 +303,40 @@ useEffect(() => {
   };
   
   
-  const handleSaveProfile = async () => {
-    const formData = new FormData();
-    formData.append("cleanerId", userId); // or whatever cleaner ID you're using
-    formData.append("skills", tempProfile.skills);
-    formData.append("experience", tempProfile.experience);
-    formData.append("preferredAreas", tempProfile.preferred_areas);
-    formData.append("availability", tempProfile.availability);
-  
-    if (tempProfile.imageFile) {
-      formData.append("profileImage", tempProfile.imageFile);
+ const handleSaveProfile = async () => {
+  const formData = new FormData();
+
+  formData.append("cleanerId", userId);
+  formData.append("skills", tempProfile.skills || "");
+  formData.append("experience", tempProfile.experience || "");
+  formData.append("preferredAreas", tempProfile.preferred_areas || "");
+  formData.append("availability", tempProfile.availability || "");
+  formData.append("is_active", tempProfile.is_active ? 1 : 0);
+
+  if (tempProfile.imageFile) {
+    formData.append("profileImage", tempProfile.imageFile);
+  }
+
+  try {
+    const response = await fetch("http://localhost:5000/api/cleaner/profile", {
+      method: "POST",
+      body: formData,
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      toast.success("Profile updated successfully.");
+    } else {
+      toast.error("Failed to update profile.");
     }
-    
-    try {
-      const response = await fetch("http://localhost:5000/api/cleaner/profile", {
-        method: "POST",
-        body: formData
-      });
-  
-      const result = await response.json();
-      if (result.success) {
-        toast.success("Profile updated successfully.");
-        // optionally re-fetch cleaner profile
-      } else {
-        toast.error("Failed to update profile.");
-      }
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      toast.error("An error occurred while updating your profile.");
-    }
-  };
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    toast.error("An error occurred while updating your profile.");
+  }
+};
+
+
+
   
   
   // Helper to filter jobs for the selected date
@@ -403,32 +405,40 @@ return jobDate === selectedDate.toDateString();
   };
   
   const handleSaveAll = async (e) => {
-    e.preventDefault();
-  
-    // Save service (if any)
-    if (newService.name && newService.price) {
-      await handleAddService();
-    }
-  
-    // Save profile 
-    await handleSaveProfile();
-  
-    //  Re-fetch updated profile from backend
-    try {
-      const res = await fetch(`http://localhost:5000/api/profile/${cleanerId}`);
-      const data = await res.json();
-      if (data.success && data.profile) {
-        setTempProfile(data.profile); // Update state with fresh data
-  
-        //  Force reload image (append timestamp to avoid cache)
-        if (data.profile.image_path) {
-          setPreviewImageUrl(`http://localhost:5000/${data.profile.image_path}?t=${Date.now()}`);
-        }
+  e.preventDefault();
+
+  // Save service (if any)
+  if (newService.name && newService.price) {
+    await handleAddService();
+  }
+
+  // Save profile 
+  await handleSaveProfile();
+
+  // Re-fetch updated profile from backend
+  try {
+    const res = await fetch(`http://localhost:5000/api/profile/${cleanerId}`);
+    const data = await res.json();
+    if (data.success && data.profile) {
+      setTempProfile({
+        skills: data.profile.skills || "",
+        experience: data.profile.experience || "",
+        preferred_areas: data.profile.preferred_areas || "",
+        availability: data.profile.availability || "",
+        is_active: data.profile.is_active === 1,
+        image_path: data.profile.image_path || "",
+        imageFile: null // Don't override unless needed
+      });
+
+      if (data.profile.image_path) {
+        setPreviewImageUrl(`http://localhost:5000/${data.profile.image_path}?t=${Date.now()}`);
       }
-    } catch (err) {
-      console.error("Failed to refresh profile after save:", err);
     }
-  };
+  } catch (err) {
+    console.error("Failed to refresh profile after save:", err);
+  }
+};
+
   
   const fetchCleaners = async () => {
     try {
@@ -454,6 +464,7 @@ return jobDate === selectedDate.toDateString();
       console.error("Failed to fetch cleaners:", error);
     }
   };
+  
   
   
   const handleViewProfile = async (cleaner) => {
@@ -1089,23 +1100,13 @@ const [userError, setUserError] = useState("");
                     <Button 
                       variant="outline-warning" 
                       size="sm" 
-                      onClick={() => setShowScheduleModal(true)} // 🔥 Trigger modal here
+                      onClick={() => setShowScheduleModal(true)} 
                     >
                       Manage Schedule
                     </Button>
                   </div>
                 </div>
               </div>
-
-                <div className="col-md-6 col-lg-4">
-                <div className="card shadow h-100">
-                    <div className="card-body">
-                    <h5 className="card-title">Notifications & Messaging</h5>
-                    <p className="card-text">Get notified and chat with homeowners.</p>
-                    <Button variant="outline-primary" size="sm">Go to Inbox</Button>
-                    </div>
-                </div>
-                </div>
 
                 <div className="col-md-6 col-lg-4">
                 <div className="card shadow h-100">
