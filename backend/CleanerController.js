@@ -52,122 +52,125 @@ class CleanerController {
   
     // Create or update profile
     saveProfile(req, res) {
-      const { cleanerId, skills, experience, preferredAreas, availability } = req.body;
-  
-      const checkSql = `SELECT * FROM cleaner_profiles WHERE cleaner_id = ?`;
-      this.db.get(checkSql, [cleanerId], (err, profile) => {
+  const { cleanerId, skills, experience, preferredAreas, availability, is_active } = req.body;
+
+  const checkSql = `SELECT * FROM cleaner_profiles WHERE cleaner_id = ?`;
+  this.db.get(checkSql, [cleanerId], (err, profile) => {
+    if (err) {
+      console.error('Check profile error:', err.message);
+      return res.status(500).json({ success: false });
+    }
+
+    if (profile) {
+      //  Update existing profile
+      const updateSql = `
+        UPDATE cleaner_profiles 
+        SET skills = ?, experience = ?, preferred_areas = ?, availability = ?, is_active = ?
+        WHERE cleaner_id = ?`;
+
+      this.db.run(updateSql, [skills, experience, preferredAreas, availability, is_active ? 1 : 0, cleanerId], function (err) {
         if (err) {
-          console.error('Check profile error:', err.message);
+          console.error('Update profile error:', err.message);
           return res.status(500).json({ success: false });
         }
-  
-        if (profile) {
-          // Update
-          const updateSql = `
-            UPDATE cleaner_profiles 
-            SET skills = ?, experience = ?, preferred_areas = ?, availability = ?
-            WHERE cleaner_id = ?`;
-  
-          this.db.run(updateSql, [skills, experience, preferredAreas, availability, cleanerId], function (err) {
-            if (err) {
-              console.error('Update profile error:', err.message);
-              return res.status(500).json({ success: false });
-            }
-            res.json({ success: true });
-          });
-        } else {
-          // Insert
-          const insertSql = `
-            INSERT INTO cleaner_profiles (cleaner_id, skills, experience, preferred_areas, availability)
-            VALUES (?, ?, ?, ?, ?)`;
-  
-          this.db.run(insertSql, [cleanerId, skills, experience, preferredAreas, availability], function (err) {
-            if (err) {
-              console.error('Insert profile error:', err.message);
-              return res.status(500).json({ success: false });
-            }
-            res.status(201).json({ success: true, profileId: this.lastID });
-          });
+        res.json({ success: true });
+      });
+    } else {
+      //  Insert new profile
+      const insertSql = `
+        INSERT INTO cleaner_profiles (cleaner_id, skills, experience, preferred_areas, availability, is_active)
+        VALUES (?, ?, ?, ?, ?, ?)`;
+
+      this.db.run(insertSql, [cleanerId, skills, experience, preferredAreas, availability, is_active ? 1 : 0], function (err) {
+        if (err) {
+          console.error('Insert profile error:', err.message);
+          return res.status(500).json({ success: false });
         }
+        res.status(201).json({ success: true, profileId: this.lastID });
       });
     }
+  });
+}
+
   
     // Fetch cleaner profile
     getProfile(req, res) {
-      const { cleanerId } = req.params;
-      const sql = `
-        SELECT cp.*, u.image_path 
-        FROM cleaner_profiles cp
-        JOIN users u ON cp.cleaner_id = u.id
-        WHERE cp.cleaner_id = ?
-      `;
-    
-      this.db.get(sql, [cleanerId], (err, row) => {
-        if (err) {
-          console.error('Get profile error:', err.message);
-          res.status(500).json({ success: false });
-        } else {
-          res.json({ success: true, profile: row });
-        }
-      });
+  const cleanerId = req.params.cleanerId;
+
+  const sql = `SELECT * FROM cleaner_profiles WHERE cleaner_id = ?`;
+
+  this.db.get(sql, [cleanerId], (err, row) => {
+    if (err) {
+      console.error("Get profile error:", err.message);
+      return res.status(500).json({ success: false });
     }
+
+    if (row) {
+      res.json({ success: true, profile: row }); //  row must include is_active
+    } else {
+      res.json({ success: false, message: "Profile not found" });
+    }
+  });
+}
+
     
   
     getAllCleaners(req, res) {
-      const { preferredArea, minimumRating, minPrice, maxPrice } = req.query;
-    
-      let sql = `
-        SELECT 
-          users.id, 
-          users.name, 
-          users.email, 
-          users.image_path, 
-          cp.skills, 
-          cp.experience, 
-          cp.preferred_areas, 
-          cp.availability,
-          ROUND(AVG(b.rating), 2) AS average_rating,
-          MIN(s.price) AS min_service_price,
-          MAX(s.price) AS max_service_price
-        FROM users
-        LEFT JOIN cleaner_profiles cp ON users.id = cp.cleaner_id
-        LEFT JOIN bookings b ON users.id = b.cleaner_id AND b.completed = 1 AND b.rating IS NOT NULL
-        LEFT JOIN services s ON users.id = s.cleaner_id
-        WHERE users.role = 'Cleaner'
-      `;
-    
-      const params = [];
-    
-      if (preferredArea) {
-        sql += ` AND cp.preferred_areas = ?`;
-        params.push(preferredArea);
-      }
-    
-      sql += ` GROUP BY users.id`;
-    
-      this.db.all(sql, params, (err, rows) => {
-        if (err) {
-          console.error('Get filtered cleaners error:', err.message);
-          return res.status(500).json({ success: false });
-        }
-    
-        let filtered = rows;
-    
-        if (minimumRating) {
-          filtered = filtered.filter(c => parseFloat(c.average_rating || 0) >= parseFloat(minimumRating));
-        }
-    
-        if (minPrice !== undefined) {
-          filtered = filtered.filter(c => parseFloat(c.min_service_price || 0) >= parseFloat(minPrice));
-        }
-    
-        if (maxPrice !== undefined) {
-          filtered = filtered.filter(c => parseFloat(c.max_service_price || 0) <= parseFloat(maxPrice));
-        }
-    
-        res.json({ success: true, cleaners: filtered });
-      });
+  const { preferredArea, minimumRating, minPrice, maxPrice } = req.query;
+
+  let sql = `
+    SELECT 
+      users.id, 
+      users.name, 
+      users.email, 
+      users.image_path, 
+      cp.skills, 
+      cp.experience, 
+      cp.preferred_areas, 
+      cp.availability,
+      ROUND(AVG(b.rating), 2) AS average_rating,
+      MIN(s.price) AS min_service_price,
+      MAX(s.price) AS max_service_price
+    FROM users
+    LEFT JOIN cleaner_profiles cp ON users.id = cp.cleaner_id
+    LEFT JOIN bookings b ON users.id = b.cleaner_id AND b.completed = 1 AND b.rating IS NOT NULL
+    LEFT JOIN services s ON users.id = s.cleaner_id
+    WHERE users.role = 'Cleaner' AND cp.is_active = 1
+  `;
+
+  const params = [];
+
+  if (preferredArea) {
+    sql += ` AND cp.preferred_areas = ?`;
+    params.push(preferredArea);
+  }
+
+  sql += ` GROUP BY users.id`;
+
+  this.db.all(sql, params, (err, rows) => {
+    if (err) {
+      console.error('Get filtered cleaners error:', err.message);
+      return res.status(500).json({ success: false });
     }
+
+    let filtered = rows;
+
+    if (minimumRating) {
+      filtered = filtered.filter(c => parseFloat(c.average_rating || 0) >= parseFloat(minimumRating));
+    }
+
+    if (minPrice !== undefined) {
+      filtered = filtered.filter(c => parseFloat(c.min_service_price || 0) >= parseFloat(minPrice));
+    }
+
+    if (maxPrice !== undefined) {
+      filtered = filtered.filter(c => parseFloat(c.max_service_price || 0) <= parseFloat(maxPrice));
+    }
+
+    res.json({ success: true, cleaners: filtered });
+  });
+}
+
     
     
     
@@ -279,59 +282,60 @@ class CleanerController {
       });
     }
     
-    // profile save with images
     saveProfileWithImage(req, res) {
-      const { cleanerId, skills, experience, preferredAreas, availability } = req.body;
-      const imagePath = req.file ? `images/cleaners/${req.file.filename}` : null;
-  
-      const checkSql = `SELECT * FROM cleaner_profiles WHERE cleaner_id = ?`;
-      this.db.get(checkSql, [cleanerId], (err, profile) => {
+  const { cleanerId, skills, experience, preferredAreas, availability, is_active } = req.body;
+  const isActiveValue = is_active === "1" ? 1 : 0;
+
+  const imagePath = req.file ? `images/cleaners/${req.file.filename}` : null;
+
+  const checkSql = `SELECT * FROM cleaner_profiles WHERE cleaner_id = ?`;
+  this.db.get(checkSql, [cleanerId], (err, profile) => {
+    if (err) {
+      console.error("Profile check error:", err.message);
+      return res.status(500).json({ success: false });
+    }
+
+    const updateImagePath = (callback) => {
+      if (imagePath) {
+        this.db.run(`UPDATE users SET image_path = ? WHERE id = ?`, [imagePath, cleanerId], (err) => {
+          if (err) console.error("Image update failed:", err.message);
+          callback();
+        });
+      } else {
+        callback();
+      }
+    };
+
+    if (profile) {
+      const updateSql = `
+        UPDATE cleaner_profiles 
+        SET skills = ?, experience = ?, preferred_areas = ?, availability = ?, is_active = ?
+        WHERE cleaner_id = ?
+      `;
+
+      this.db.run(updateSql, [skills, experience, preferredAreas, availability, isActiveValue, cleanerId], (err) => {
         if (err) {
-          console.error("Profile check error:", err.message);
+          console.error("Profile update error:", err.message);
           return res.status(500).json({ success: false });
         }
-  
-        const updateImagePath = (callback) => {
-          if (imagePath) {
-            this.db.run(`UPDATE users SET image_path = ? WHERE id = ?`, [imagePath, cleanerId], (err) => {
-              if (err) console.error("Image update failed:", err.message);
-              callback();
-            });
-          } else {
-            callback();
-          }
-        };
-  
-        if (profile) {
-          const updateSql = `
-            UPDATE cleaner_profiles 
-            SET skills = ?, experience = ?, preferred_areas = ?, availability = ?
-            WHERE cleaner_id = ?
-          `;
-  
-          this.db.run(updateSql, [skills, experience, preferredAreas, availability, cleanerId], (err) => {
-            if (err) {
-              console.error("Profile update error:", err.message);
-              return res.status(500).json({ success: false });
-            }
-            updateImagePath(() => res.json({ success: true }));
-          });
-        } else {
-          const insertSql = `
-            INSERT INTO cleaner_profiles (cleaner_id, skills, experience, preferred_areas, availability)
-            VALUES (?, ?, ?, ?, ?)
-          `;
-  
-          this.db.run(insertSql, [cleanerId, skills, experience, preferredAreas, availability], function (err) {
-            if (err) {
-              console.error("Profile insert error:", err.message);
-              return res.status(500).json({ success: false });
-            }
-            updateImagePath(() => res.status(201).json({ success: true }));
-          });
+        updateImagePath(() => res.json({ success: true }));
+      });
+    } else {
+      const insertSql = `
+        INSERT INTO cleaner_profiles (cleaner_id, skills, experience, preferred_areas, availability, is_active)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `;
+
+      this.db.run(insertSql, [cleanerId, skills, experience, preferredAreas, availability, isActiveValue], function (err) {
+        if (err) {
+          console.error("Profile insert error:", err.message);
+          return res.status(500).json({ success: false });
         }
+        updateImagePath(() => res.status(201).json({ success: true }));
       });
     }
+  });
+}
 
     // get cleaner reviews from homeowner
     getCleanerReviews(req, res) {
