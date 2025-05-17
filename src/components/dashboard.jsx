@@ -633,6 +633,28 @@ return jobDate === selectedDate.toDateString();
       console.error("Failed to fetch favourites:", error);
     }
   };
+
+  const handleCleanerWithdraw = async (amount) => {
+  try {
+    const res = await fetch("http://localhost:5000/api/wallet/withdraw", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: cleanerId, amount }),  // use cleanerId
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      toast.success("Withdrawal successful!");
+      fetchCleanerWallet(); // refresh balance
+    } else {
+      toast.error(data.message || "Withdrawal failed.");
+    }
+  } catch (err) {
+    console.error("Withdrawal error:", err);
+    toast.error("Something went wrong.");
+  }
+};
+
   // Fetch wallet balance
 const fetchWalletBalance = async () => {
   try {
@@ -1248,6 +1270,7 @@ const [userError, setUserError] = useState("");
         show={showCleanerWalletModal}
         onHide={() => setShowCleanerWalletModal(false)}
         cleanerWalletBalance={cleanerWalletBalance}
+        onWithdraw={handleCleanerWithdraw}
       />
 
       {/*Schedule For Cleaner modal */}
