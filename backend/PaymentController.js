@@ -87,6 +87,26 @@ class PaymentController {
         res.json({ success: true });
       });
     }
+    // for cleaner to withdraw wallet
+    withdrawWallet(req, res) {
+      const { userId, amount } = req.body;
+  
+      const sql = `
+        INSERT INTO wallets (user_id, balance, updated_at)
+        VALUES (?, ?, datetime('now'))
+        ON CONFLICT(user_id) DO UPDATE 
+        SET balance = balance - excluded.balance,
+            updated_at = datetime('now')
+      `;
+  
+      this.db.run(sql, [userId, amount], function (err) {
+        if (err) {
+          console.error("Withdraw error:", err.message);
+          return res.status(500).json({ success: false });
+        }
+        res.json({ success: true });
+      });
+    }
     // add paymenet to homeowner wallet
     addPaymentRecord(req, res) {
         const { bookingId, amount, method, status, userId } = req.body;

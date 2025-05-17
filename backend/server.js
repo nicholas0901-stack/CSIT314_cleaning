@@ -92,6 +92,7 @@ app.get('/api/cleaners/:cleanerId/reviews', (req, res) => cleanerController.getC
 // Wallet routes
 app.get('/api/wallet/:userId', (req, res) => paymentController.getWalletBalance(req, res));
 app.post('/api/wallet/topup', (req, res) => paymentController.topUpWallet(req, res));
+app.post('/api/wallet/withdraw', (req, res) => paymentController.withdrawWallet(req, res));
 
 // Payment routes
 app.post('/api/payments', (req, res) => paymentController.addPaymentRecord(req, res));
