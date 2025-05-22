@@ -121,13 +121,13 @@ const Home = () => {
           <h2 className="fw-bold mb-4">Meet Our Team</h2>
           <div className="row g-4">
             {[
-              { name: "", title: "Leader", image: "/img/team/team-member1.jpg", desc: "Edit bio." },
-              { name: "", title: "Team Member", image: "/img/staff2.jpg", desc: "Edit bio." },
-              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
-              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
-              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
-              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
-              { name: "", title: "Team Member", image: "/img/staff3.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/team/team-member1.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/team/team-member1.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/team/team-member1.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/team/team-member1.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/team/team-member1.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/team/team-member1.jpg", desc: "Edit bio." },
+              { name: "", title: "Team Member", image: "/img/team/team-member1.jpg", desc: "Edit bio." },
             ].map((member, index) => (
               <div className="col-md-4" key={index}>
                 <div className="card h-100 shadow-sm">
